@@ -1,352 +1,516 @@
-<script>
-  // ==== Utility: parse a matrix from textarea (rows separated by newline, values by space/comma) ====
-  function parseMatrix(text, expectedRows, expectedCols, name) {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      throw new Error(name + ": textarea is empty.");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Metasurface 10x10 Far-Field Simulator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f4f4f4;
     }
+    h1 {
+      margin-bottom: 5px;
+    }
+    .section {
+      background: #ffffff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .section h2 {
+      margin-top: 0;
+    }
+    textarea {
+      width: 100%;
+      height: 120px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      box-sizing: border-box;
+      margin-bottom: 8px;
+    }
+    label {
+      font-weight: bold;
+    }
+    button {
+      margin-right: 8px;
+      margin-top: 5px;
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      background: #1976d2;
+      color: #fff;
+    }
+    button:hover {
+      background: #0f5ca8;
+    }
+    select {
+      margin-left: 8px;
+      padding: 4px 8px;
+    }
+    #simStatus {
+      margin-top: 8px;
+      font-weight: bold;
+    }
+    #farFieldView table {
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    #farFieldView th, #farFieldView td {
+      border: 1px solid #ccc;
+      text-align: center;
+      padding: 3px 5px;
+      font-size: 11px;
+      min-width: 40px;
+    }
+  </style>
+</head>
+<body>
 
-    const rowsRaw = trimmed.split(/\r?\n/).filter(r => r.trim().length > 0);
-    if (rowsRaw.length !== expectedRows) {
-      throw new Error(name + ": expected " + expectedRows + " rows, got " + rowsRaw.length);
-    }
-    const mat = [];
-    for (let i = 0; i < expectedRows; i++) {
-      const vals = rowsRaw[i].trim().split(/[\s,]+/).filter(v => v.length > 0);
-      if (vals.length !== expectedCols) {
-        throw new Error(
-          name + ": row " + (i+1) +
-          " expected " + expectedCols + " columns, got " + vals.length
-        );
+  <h1>Metasurface 10×10 Far-Field Simulator</h1>
+  <p>Paste your 24×24 library (φ<sub>x</sub>, φ<sub>y</sub>, T<sub>x</sub>, T<sub>y</sub>) and 10×10 design (L, W, θ). Then choose input polarization and run the simulation.</p>
+
+  <!-- ============== LIBRARY INPUTS (24x24) ============== -->
+  <div class="section">
+    <h2>Library Data (24×24 each)</h2>
+    <p>
+      Format: values separated by space/comma, each row on a new line (24 rows × 24 columns). 
+      If you leave these empty, simulator uses a simple default library: φx = φy = 0, Tx = Ty = 1.
+    </p>
+
+    <label for="phiXInput">phiX (Ex phase, radians, 24×24):</label><br/>
+    <textarea id="phiXInput" placeholder="Paste 24x24 matrix here (phiX)..."></textarea>
+
+    <label for="phiYInput">phiY (Ey phase, radians, 24×24):</label><br/>
+    <textarea id="phiYInput" placeholder="Paste 24x24 matrix here (phiY)..."></textarea>
+
+    <label for="TxInput">Tx (Ex transmission amplitude, 0–1, 24×24):</label><br/>
+    <textarea id="TxInput" placeholder="Paste 24x24 matrix here (Tx)..."></textarea>
+
+    <label for="TyInput">Ty (Ey transmission amplitude, 0–1, 24×24):</label><br/>
+    <textarea id="TyInput" placeholder="Paste 24x24 matrix here (Ty)..."></textarea>
+  </div>
+
+  <!-- ============== DESIGN INPUTS (10x10) ============== -->
+  <div class="section">
+    <h2>Metasurface Design (10×10)</h2>
+    <p>Paste your 10×10 L, W, θ (degrees) design. Each must be 10 rows × 10 columns.</p>
+
+    <label for="LdesignInput">L (nm, 10×10):</label><br/>
+    <textarea id="LdesignInput" placeholder="Paste 10x10 Length matrix here..."></textarea>
+
+    <label for="WdesignInput">W (nm, 10×10):</label><br/>
+    <textarea id="WdesignInput" placeholder="Paste 10x10 Width matrix here..."></textarea>
+
+    <label for="ThetaDesignInput">θ (rotation angle, degrees, 10×10) – not used in far-field yet, but stored:</label><br/>
+    <textarea id="ThetaDesignInput" placeholder="Paste 10x10 Theta matrix here..."></textarea>
+
+    <button onclick="fillDemoDesign()">Fill 10×10 demo design (simple)</button>
+  </div>
+
+  <!-- ============== SIMULATION CONTROL ============== -->
+  <div class="section">
+    <h2>Simulation Control</h2>
+    <label for="polSelect">Input polarization:</label>
+    <select id="polSelect">
+      <option value="Ex">Ex</option>
+      <option value="Ey">Ey</option>
+      <option value="P45">+45°</option>
+      <option value="M45">-45°</option>
+      <option value="RCP">RCP</option>
+      <option value="LCP">LCP</option>
+    </select>
+
+    <button onclick="runSimulation()">Run Simulation</button>
+
+    <div id="simStatus"></div>
+  </div>
+
+  <!-- ============== FAR-FIELD OUTPUT ============== -->
+  <div class="section">
+    <h2>Far-Field Intensity (Orders m,n = -8 ... +8)</h2>
+    <p>
+      Table shows normalized intensity in each diffraction order.  
+      (0,0) order is outlined in <span style="color:red;">red</span>.  
+      Designed target for selected polarization is outlined in <span style="color:blue;">blue</span>.
+    </p>
+    <div id="farFieldView"></div>
+  </div>
+
+  <!-- ============== MAIN SCRIPT ============== -->
+  <script>
+    // ==== Utility: parse a matrix from textarea (rows separated by newline, values by space/comma) ====
+    function parseMatrix(text, expectedRows, expectedCols, name) {
+      const trimmed = text.trim();
+      if (!trimmed) {
+        throw new Error(name + ": textarea is empty.");
       }
-      mat.push(vals.map(parseFloat));
-    }
-    return mat;
-  }
 
-  // ==== Build library from 2D text inputs ====
-  function buildLibraryFromInputs() {
-    const phiX_2D = parseMatrix(
-      document.getElementById("phiXInput").value,
-      24, 24, "phiX"
-    );
-    const phiY_2D = parseMatrix(
-      document.getElementById("phiYInput").value,
-      24, 24, "phiY"
-    );
-    const Tx_2D = parseMatrix(
-      document.getElementById("TxInput").value,
-      24, 24, "Tx"
-    );
-    const Ty_2D = parseMatrix(
-      document.getElementById("TyInput").value,
-      24, 24, "Ty"
-    );
-
-    const L_LIST = Array.from({ length: 24 }, (_, i) => 50 + 10 * i); // 50..280
-    const W_LIST = Array.from({ length: 24 }, (_, i) => 50 + 10 * i);
-
-    return {
-      phiX_2D,
-      phiY_2D,
-      Tx_2D,
-      Ty_2D,
-      L_LIST,
-      W_LIST
-    };
-  }
-
-  // ==== Find index in [50,60,...,280] closest to value ====
-  function findIndexForValue(list, val) {
-    // Round to nearest 10 and clamp
-    let rounded = Math.round((val - 50) / 10) * 10 + 50;
-    if (rounded < 50) rounded = 50;
-    if (rounded > 280) rounded = 280;
-    const idx = (rounded - 50) / 10;  // 0..23
-    return idx;
-  }
-
-  // ==== Get 10x10 metasurface design (L,W,theta) from text ====
-  function getDesignMatrices() {
-    const L_design = parseMatrix(
-      document.getElementById("LdesignInput").value,
-      10, 10, "L_design"
-    );
-    const W_design = parseMatrix(
-      document.getElementById("WdesignInput").value,
-      10, 10, "W_design"
-    );
-    const Theta_design = parseMatrix(
-      document.getElementById("ThetaDesignInput").value,
-      10, 10, "Theta_design"
-    );
-    return { L_design, W_design, Theta_design };
-  }
-
-  // ==== Build complex field for selected input polarization ====
-  function buildComplexField(library, design, pol) {
-    const { phiX_2D, phiY_2D, Tx_2D, Ty_2D, L_LIST, W_LIST } = library;
-    const { L_design, W_design } = design;
-
-    const Nx = 10;
-    const Ny = 10;
-
-    const complexField = Array.from({ length: Nx }, () =>
-      Array.from({ length: Ny }, () => ({ re: 0, im: 0 }))
-    );
-
-    const invRoot2 = 1 / Math.sqrt(2);
-
-    for (let p = 0; p < Nx; p++) {
-      for (let q = 0; q < Ny; q++) {
-        const L_nm = L_design[p][q];
-        const W_nm = W_design[p][q];
-
-        const iL = findIndexForValue(L_LIST, L_nm); // 0..23
-        const jW = findIndexForValue(W_LIST, W_nm); // 0..23
-
-        const phiX = phiX_2D[iL][jW];
-        const phiY = phiY_2D[iL][jW];
-        const Tx = Tx_2D[iL][jW];
-        const Ty = Ty_2D[iL][jW];
-
-        // Input Jones vector [Ex Ey], complex.
-        let Ex_in_re = 0, Ex_in_im = 0;
-        let Ey_in_re = 0, Ey_in_im = 0;
-
-        if (pol === "Ex") {
-          Ex_in_re = 1; Ey_in_re = 0;
-        } else if (pol === "Ey") {
-          Ex_in_re = 0; Ey_in_re = 1;
-        } else if (pol === "P45") {
-          Ex_in_re = invRoot2; Ey_in_re = invRoot2;
-        } else if (pol === "M45") {
-          Ex_in_re = invRoot2; Ey_in_re = -invRoot2;
-        } else if (pol === "RCP") {
-          // (1/√2)[1, -i] => Ey has negative imaginary part
-          Ex_in_re = invRoot2;
-          Ey_in_im = -invRoot2;
-        } else if (pol === "LCP") {
-          // (1/√2)[1, +i] => Ey has positive imaginary part
-          Ex_in_re = invRoot2;
-          Ey_in_im = invRoot2;
+      const rowsRaw = trimmed.split(/\r?\n/).filter(r => r.trim().length > 0);
+      if (rowsRaw.length !== expectedRows) {
+        throw new Error(name + ": expected " + expectedRows + " rows, got " + rowsRaw.length);
+      }
+      const mat = [];
+      for (let i = 0; i < expectedRows; i++) {
+        const vals = rowsRaw[i].trim().split(/[\s,]+/).filter(v => v.length > 0);
+        if (vals.length !== expectedCols) {
+          throw new Error(
+            name + ": row " + (i+1) +
+            " expected " + expectedCols + " columns, got " + vals.length
+          );
         }
-
-        // e^{i φx}
-        const cx = Math.cos(phiX);
-        const sx = Math.sin(phiX);
-        // e^{i φy}
-        const cy = Math.cos(phiY);
-        const sy = Math.sin(phiY);
-
-        // Ex_out = Tx * e^{i φx} * Ex_in
-        const Ex_out_re = Tx * (Ex_in_re * cx - Ex_in_im * sx);
-        const Ex_out_im = Tx * (Ex_in_re * sx + Ex_in_im * cx);
-
-        // Ey_out = Ty * e^{i φy} * Ey_in
-        const Ey_out_re = Ty * (Ey_in_re * cy - Ey_in_im * sy);
-        const Ey_out_im = Ty * (Ey_in_re * sy + Ey_in_im * cy);
-
-        // Total scalar field = Ex_out + Ey_out
-        complexField[p][q] = {
-          re: Ex_out_re + Ey_out_re,
-          im: Ex_out_im + Ey_out_im
-        };
+        mat.push(vals.map(parseFloat));
       }
+      return mat;
     }
 
-    return complexField;
-  }
+    // ==== Build library from 2D text inputs (or default) ====
+    function buildLibraryFromInputs() {
+      const phiX_text = document.getElementById("phiXInput").value.trim();
+      const phiY_text = document.getElementById("phiYInput").value.trim();
+      const Tx_text   = document.getElementById("TxInput").value.trim();
+      const Ty_text   = document.getElementById("TyInput").value.trim();
 
-  // ==== Compute far-field over orders m,n = -maxOrder..+maxOrder ====
-  function computeFarFieldAllOrders(complexField, maxOrder) {
-    const Nx = complexField.length;
-    const Ny = complexField[0].length;
-    const size = 2 * maxOrder + 1;
+      const L_LIST = Array.from({ length: 24 }, (_, i) => 50 + 10 * i); // 50..280
+      const W_LIST = Array.from({ length: 24 }, (_, i) => 50 + 10 * i);
 
-    const farField = Array.from({ length: size }, (_, i) =>
-      Array.from({ length: size }, (_, j) => ({
-        re: 0, im: 0, I: 0, Inorm: 0,
-        m: i - maxOrder,
-        n: j - maxOrder
-      }))
-    );
-
-    for (let m = -maxOrder; m <= maxOrder; m++) {
-      for (let n = -maxOrder; n <= maxOrder; n++) {
-        let re = 0, im = 0;
-        for (let px = 0; px < Nx; px++) {
-          for (let qy = 0; qy < Ny; qy++) {
-            const a = complexField[px][qy];
-            const phase = -2 * Math.PI * (m * px / Nx + n * qy / Ny);
-            const c = Math.cos(phase);
-            const s = Math.sin(phase);
-            const newRe = a.re * c - a.im * s;
-            const newIm = a.re * s + a.im * c;
-            re += newRe;
-            im += newIm;
+      // If all library boxes are empty, use default uniform library
+      if (!phiX_text && !phiY_text && !Tx_text && !Ty_text) {
+        const phiX_2D = [];
+        const phiY_2D = [];
+        const Tx_2D   = [];
+        const Ty_2D   = [];
+        for (let i = 0; i < 24; i++) {
+          const rowPhiX = [];
+          const rowPhiY = [];
+          const rowTx   = [];
+          const rowTy   = [];
+          for (let j = 0; j < 24; j++) {
+            rowPhiX.push(0);   // phase 0
+            rowPhiY.push(0);   // phase 0
+            rowTx.push(1.0);   // full transmission
+            rowTy.push(1.0);   // full transmission
           }
+          phiX_2D.push(rowPhiX);
+          phiY_2D.push(rowPhiY);
+          Tx_2D.push(rowTx);
+          Ty_2D.push(rowTy);
         }
-        const I = re * re + im * im;
-        const i = m + maxOrder;
-        const j = n + maxOrder;
-        farField[i][j].re = re;
-        farField[i][j].im = im;
-        farField[i][j].I  = I;
+        return { phiX_2D, phiY_2D, Tx_2D, Ty_2D, L_LIST, W_LIST };
       }
+
+      // Otherwise, parse user matrices
+      const phiX_2D = parseMatrix(phiX_text, 24, 24, "phiX");
+      const phiY_2D = parseMatrix(phiY_text, 24, 24, "phiY");
+      const Tx_2D   = parseMatrix(Tx_text,   24, 24, "Tx");
+      const Ty_2D   = parseMatrix(Ty_text,   24, 24, "Ty");
+
+      return {
+        phiX_2D,
+        phiY_2D,
+        Tx_2D,
+        Ty_2D,
+        L_LIST,
+        W_LIST
+      };
     }
 
-    // Normalize so sum(Inorm) = 1
-    let totalI = 0;
-    for (let i = 0; i < size; i++) {
-      for (let j = 0; j < size; j++) {
-        totalI += farField[i][j].I;
-      }
+    // ==== Find index in [50,60,...,280] closest to value ====
+    function findIndexForValue(list, val) {
+      let rounded = Math.round((val - 50) / 10) * 10 + 50;
+      if (rounded < 50) rounded = 50;
+      if (rounded > 280) rounded = 280;
+      const idx = (rounded - 50) / 10;  // 0..23
+      return idx;
     }
-    if (totalI > 0) {
+
+    // ==== Get 10x10 metasurface design (L,W,theta) from text ====
+    function getDesignMatrices() {
+      const L_text = document.getElementById("LdesignInput").value.trim();
+      const W_text = document.getElementById("WdesignInput").value.trim();
+      const T_text = document.getElementById("ThetaDesignInput").value.trim();
+
+      if (!L_text || !W_text || !T_text) {
+        throw new Error("Please fill L, W and Theta 10x10 design matrices or click demo button.");
+      }
+
+      const L_design = parseMatrix(L_text, 10, 10, "L_design");
+      const W_design = parseMatrix(W_text, 10, 10, "W_design");
+      const Theta_design = parseMatrix(T_text, 10, 10, "Theta_design");
+      return { L_design, W_design, Theta_design };
+    }
+
+    // ==== Build complex field for selected input polarization ====
+    function buildComplexField(library, design, pol) {
+      const { phiX_2D, phiY_2D, Tx_2D, Ty_2D, L_LIST, W_LIST } = library;
+      const { L_design, W_design } = design;
+
+      const Nx = 10;
+      const Ny = 10;
+
+      const complexField = Array.from({ length: Nx }, () =>
+        Array.from({ length: Ny }, () => ({ re: 0, im: 0 }))
+      );
+
+      const invRoot2 = 1 / Math.sqrt(2);
+
+      for (let p = 0; p < Nx; p++) {
+        for (let q = 0; q < Ny; q++) {
+          const L_nm = L_design[p][q];
+          const W_nm = W_design[p][q];
+
+          const iL = findIndexForValue(L_LIST, L_nm); // 0..23
+          const jW = findIndexForValue(W_LIST, W_nm); // 0..23
+
+          const phiX = phiX_2D[iL][jW];
+          const phiY = phiY_2D[iL][jW];
+          const Tx = Tx_2D[iL][jW];
+          const Ty = Ty_2D[iL][jW];
+
+          // Input Jones vector [Ex Ey], complex.
+          let Ex_in_re = 0, Ex_in_im = 0;
+          let Ey_in_re = 0, Ey_in_im = 0;
+
+          if (pol === "Ex") {
+            Ex_in_re = 1; Ey_in_re = 0;
+          } else if (pol === "Ey") {
+            Ex_in_re = 0; Ey_in_re = 1;
+          } else if (pol === "P45") {
+            Ex_in_re = invRoot2; Ey_in_re = invRoot2;
+          } else if (pol === "M45") {
+            Ex_in_re = invRoot2; Ey_in_re = -invRoot2;
+          } else if (pol === "RCP") {
+            // (1/√2)[1, -i]
+            Ex_in_re = invRoot2;
+            Ey_in_im = -invRoot2;
+          } else if (pol === "LCP") {
+            // (1/√2)[1, +i]
+            Ex_in_re = invRoot2;
+            Ey_in_im = invRoot2;
+          }
+
+          // e^{i φx}
+          const cx = Math.cos(phiX);
+          const sx = Math.sin(phiX);
+          // e^{i φy}
+          const cy = Math.cos(phiY);
+          const sy = Math.sin(phiY);
+
+          // Ex_out = Tx * e^{i φx} * Ex_in
+          const Ex_out_re = Tx * (Ex_in_re * cx - Ex_in_im * sx);
+          const Ex_out_im = Tx * (Ex_in_re * sx + Ex_in_im * cx);
+
+          // Ey_out = Ty * e^{i φy} * Ey_in
+          const Ey_out_re = Ty * (Ey_in_re * cy - Ey_in_im * sy);
+          const Ey_out_im = Ty * (Ey_in_re * sy + Ey_in_im * cy);
+
+          // Total scalar field = Ex_out + Ey_out
+          complexField[p][q] = {
+            re: Ex_out_re + Ey_out_re,
+            im: Ex_out_im + Ey_out_im
+          };
+        }
+      }
+
+      return complexField;
+    }
+
+    // ==== Compute far-field over orders m,n = -maxOrder..+maxOrder ====
+    function computeFarFieldAllOrders(complexField, maxOrder) {
+      const Nx = complexField.length;
+      const Ny = complexField[0].length;
+      const size = 2 * maxOrder + 1;
+
+      const farField = Array.from({ length: size }, (_, i) =>
+        Array.from({ length: size }, (_, j) => ({
+          re: 0, im: 0, I: 0, Inorm: 0,
+          m: i - maxOrder,
+          n: j - maxOrder
+        }))
+      );
+
+      for (let m = -maxOrder; m <= maxOrder; m++) {
+        for (let n = -maxOrder; n <= maxOrder; n++) {
+          let re = 0, im = 0;
+          for (let px = 0; px < Nx; px++) {
+            for (let qy = 0; qy < Ny; qy++) {
+              const a = complexField[px][qy];
+              const phase = -2 * Math.PI * (m * px / Nx + n * qy / Ny);
+              const c = Math.cos(phase);
+              const s = Math.sin(phase);
+              const newRe = a.re * c - a.im * s;
+              const newIm = a.re * s + a.im * c;
+              re += newRe;
+              im += newIm;
+            }
+          }
+          const I = re * re + im * im;
+          const i = m + maxOrder;
+          const j = n + maxOrder;
+          farField[i][j].re = re;
+          farField[i][j].im = im;
+          farField[i][j].I  = I;
+        }
+      }
+
+      // Normalize so sum(Inorm) = 1
+      let totalI = 0;
       for (let i = 0; i < size; i++) {
         for (let j = 0; j < size; j++) {
-          farField[i][j].Inorm = farField[i][j].I / totalI;
+          totalI += farField[i][j].I;
         }
+      }
+      if (totalI > 0) {
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            farField[i][j].Inorm = farField[i][j].I / totalI;
+          }
+        }
+      }
+
+      return farField;
+    }
+
+    // ==== Render far-field as table ====
+    function renderFarFieldTable(farField, maxOrder, pol) {
+      const size = 2 * maxOrder + 1;
+      const container = document.getElementById("farFieldView");
+      container.innerHTML = "";
+
+      // Determine highlight target order based on pol
+      let target_m = null, target_n = null;
+      if (pol === "Ex")   { target_m = +2; target_n = 0; }
+      if (pol === "Ey")   { target_m = -2; target_n = 0; }
+      if (pol === "RCP")  { target_m = 0;  target_n = +2; }
+      if (pol === "LCP")  { target_m = 0;  target_n = -2; }
+      if (pol === "P45")  { target_m = +2; target_n = +2; }
+      if (pol === "M45")  { target_m = -2; target_n = -2; }
+
+      // Find max normalized intensity
+      let maxInorm = 0;
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          if (farField[i][j].Inorm > maxInorm) {
+            maxInorm = farField[i][j].Inorm;
+          }
+        }
+      }
+      if (maxInorm === 0) maxInorm = 1;
+
+      const table = document.createElement("table");
+
+      // Header row (n axis)
+      const headerRow = document.createElement("tr");
+      const corner = document.createElement("th");
+      corner.textContent = "m↓ / n→";
+      headerRow.appendChild(corner);
+
+      for (let n = -maxOrder; n <= maxOrder; n++) {
+        const th = document.createElement("th");
+        th.textContent = n;
+        headerRow.appendChild(th);
+      }
+      table.appendChild(headerRow);
+
+      // Rows
+      for (let i = 0; i < size; i++) {
+        const row = document.createElement("tr");
+        const m = i - maxOrder;
+
+        const th = document.createElement("th");
+        th.textContent = m;
+        row.appendChild(th);
+
+        for (let j = 0; j < size; j++) {
+          const cell = document.createElement("td");
+          const f = farField[i][j];
+          const val = f.Inorm;
+
+          const level = Math.sqrt(val / maxInorm);
+          const g = Math.round(255 * (1 - level));
+          cell.style.backgroundColor = "rgb(" + g + "," + g + "," + g + ")";
+          cell.textContent = val.toFixed(3);
+
+          // highlight (0,0)
+          if (f.m === 0 && f.n === 0) {
+            cell.style.outline = "2px solid red";
+          }
+
+          // highlight target order in blue
+          if (target_m !== null && target_n !== null &&
+              f.m === target_m && f.n === target_n) {
+            cell.style.outline = "2px solid blue";
+          }
+
+          row.appendChild(cell);
+        }
+        table.appendChild(row);
+      }
+
+      container.appendChild(table);
+    }
+
+    // ==== Main runSimulation function ====
+    function runSimulation() {
+      const status = document.getElementById("simStatus");
+      status.style.color = "#006400";
+      status.textContent = "";
+      try {
+        const library = buildLibraryFromInputs();
+        const design = getDesignMatrices();
+        const pol = document.getElementById("polSelect").value;
+
+        const complexField = buildComplexField(library, design, pol);
+        const maxOrder = 8;
+        const farField = computeFarFieldAllOrders(complexField, maxOrder);
+
+        const sumInorm = farField
+          .flat()
+          .reduce((s, f) => s + f.Inorm, 0);
+
+        renderFarFieldTable(farField, maxOrder, pol);
+        status.textContent =
+          "Simulation completed. Sum of normalized intensity ≈ " +
+          sumInorm.toFixed(4);
+      } catch (err) {
+        console.error(err);
+        status.style.color = "red";
+        status.textContent = "Error: " + err.message;
       }
     }
 
-    return farField;
-  }
-
-  // ==== Render far-field as table ====
-  function renderFarFieldTable(farField, maxOrder, pol) {
-    const size = 2 * maxOrder + 1;
-    const container = document.getElementById("farFieldView");
-    container.innerHTML = "";
-
-    // Determine highlight target order based on pol
-    let target_m = null, target_n = null;
-    if (pol === "Ex")   { target_m = +2; target_n = 0; }
-    if (pol === "Ey")   { target_m = -2; target_n = 0; }
-    if (pol === "RCP")  { target_m = 0;  target_n = +2; }
-    if (pol === "LCP")  { target_m = 0;  target_n = -2; }
-    if (pol === "P45")  { target_m = +2; target_n = +2; }
-    if (pol === "M45")  { target_m = -2; target_n = -2; }
-
-    // Find max normalized intensity
-    let maxInorm = 0;
-    for (let i = 0; i < size; i++) {
-      for (let j = 0; j < size; j++) {
-        if (farField[i][j].Inorm > maxInorm) {
-          maxInorm = farField[i][j].Inorm;
+    // ==== Demo: simple 10×10 design fill (just for testing layout) ====
+    function fillDemoDesign() {
+      const Lrows = [];
+      const Wrows = [];
+      const Trows = [];
+      for (let i = 0; i < 10; i++) {
+        const rowL = [];
+        const rowW = [];
+        const rowT = [];
+        for (let j = 0; j < 10; j++) {
+          rowL.push(50 + 10 * (i % 24)); // simple pattern
+          rowW.push(50 + 10 * (j % 24));
+          rowT.push(0); // no rotation
         }
+        Lrows.push(rowL.join(" "));
+        Wrows.push(rowW.join(" "));
+        Trows.push(rowT.join(" "));
       }
-    }
-    if (maxInorm === 0) maxInorm = 1;
-
-    const table = document.createElement("table");
-
-    // Header row (n axis)
-    const headerRow = document.createElement("tr");
-    const corner = document.createElement("th");
-    corner.textContent = "m↓ / n→";
-    headerRow.appendChild(corner);
-
-    for (let n = -maxOrder; n <= maxOrder; n++) {
-      const th = document.createElement("th");
-      th.textContent = n;
-      headerRow.appendChild(th);
-    }
-    table.appendChild(headerRow);
-
-    // Rows
-    for (let i = 0; i < size; i++) {
-      const row = document.createElement("tr");
-      const m = i - maxOrder;
-
-      const th = document.createElement("th");
-      th.textContent = m;
-      row.appendChild(th);
-
-      for (let j = 0; j < size; j++) {
-        const cell = document.createElement("td");
-        const f = farField[i][j];
-        const val = f.Inorm;
-
-        const level = Math.sqrt(val / maxInorm);
-        const g = Math.round(255 * (1 - level));
-        cell.style.backgroundColor = "rgb(" + g + "," + g + "," + g + ")";
-        cell.textContent = val.toFixed(3);
-
-        // highlight (0,0)
-        if (f.m === 0 && f.n === 0) {
-          cell.style.outline = "2px solid red";
-        }
-
-        // highlight target order in blue
-        if (target_m !== null && target_n !== null &&
-            f.m === target_m && f.n === target_n) {
-          cell.style.outline = "2px solid blue";
-        }
-
-        row.appendChild(cell);
-      }
-      table.appendChild(row);
+      document.getElementById("LdesignInput").value = Lrows.join("\n");
+      document.getElementById("WdesignInput").value = Wrows.join("\n");
+      document.getElementById("ThetaDesignInput").value = Trows.join("\n");
     }
 
-    container.appendChild(table);
-  }
+    // Auto-fill demo design on load so you can test immediately
+    window.onload = fillDemoDesign;
 
-  // ==== Main runSimulation function ====
-  function runSimulation() {
-    const status = document.getElementById("simStatus");
-    status.style.color = "#006400";
-    status.textContent = "";
-    try {
-      const library = buildLibraryFromInputs();
-      const design = getDesignMatrices();
-      const pol = document.getElementById("polSelect").value;
+    // Expose to global (for buttons)
+    window.runSimulation = runSimulation;
+    window.fillDemoDesign = fillDemoDesign;
+  </script>
 
-      const complexField = buildComplexField(library, design, pol);
-      const maxOrder = 8;
-      const farField = computeFarFieldAllOrders(complexField, maxOrder);
-
-      // Check normalization
-      const sumInorm = farField
-        .flat()
-        .reduce((s, f) => s + f.Inorm, 0);
-
-      renderFarFieldTable(farField, maxOrder, pol);
-      status.textContent =
-        "Simulation completed. Sum of normalized intensity ≈ " +
-        sumInorm.toFixed(4);
-    } catch (err) {
-      console.error(err);
-      status.style.color = "red";
-      status.textContent = "Error: " + err.message;
-    }
-  }
-
-  // ==== Demo: simple 10×10 design fill (just for testing layout) ====
-  function fillDemoDesign() {
-    const Lrows = [];
-    const Wrows = [];
-    const Trows = [];
-    for (let i = 0; i < 10; i++) {
-      const rowL = [];
-      const rowW = [];
-      const rowT = [];
-      for (let j = 0; j < 10; j++) {
-        rowL.push(50 + 10 * (i % 24)); // simple pattern
-        rowW.push(50 + 10 * (j % 24));
-        rowT.push(0); // no rotation
-      }
-      Lrows.push(rowL.join(" "));
-      Wrows.push(rowW.join(" "));
-      Trows.push(rowT.join(" "));
-    }
-    document.getElementById("LdesignInput").value = Lrows.join("\n");
-    document.getElementById("WdesignInput").value = Wrows.join("\n");
-    document.getElementById("ThetaDesignInput").value = Trows.join("\n");
-  }
-
-  // Expose to global so the HTML onclick="" works
-  window.runSimulation = runSimulation;
-  window.fillDemoDesign = fillDemoDesign;
-</script>
+</body>
+</html>
