@@ -2,19 +2,19 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Metasurface Far-Field Simulator (10x10, 6 orders)</title>
+<title>Metasurface Far-Field Simulator (10x10, 6+1 orders)</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 10px; }
   textarea { width: 100%; height: 120px; font-family: Consolas, monospace; }
   .section { border: 1px solid #ccc; padding: 8px; margin-bottom: 8px; }
   .section h2 { margin-top: 0; font-size: 16px; }
-  label { font-weight: bold; }
-  pre { background:#f7f7f7; padding:8px; }
+  label { font-weight: bold; display:block; margin-top:6px; }
+  pre { background:#f7f7f7; padding:8px; white-space:pre; }
 </style>
 </head>
 <body>
 
-<h1>Metasurface Far-Field Simulator (10×10, 6 diffraction orders)</h1>
+<h1>Metasurface Far-Field Simulator (10×10, 6 polarizations)</h1>
 
 <div class="section">
   <h2>1. Library data (24×24 each)</h2>
@@ -59,12 +59,44 @@
 </div>
 
 <div class="section">
-  <h2>4. Results</h2>
+  <h2>4. Results (numeric)</h2>
   <pre id="output"></pre>
 </div>
 
+<div class="section">
+  <h2>5. Far-field visualization</h2>
+  <p>Spots are drawn at diffraction orders (m,n) with radius proportional to I/ΣI. (0,0) is at the center.</p>
+  <canvas id="farCanvas" width="400" height="400" style="border:1px solid #ccc;"></canvas>
+</div>
+
+<div class="section">
+  <h2>6. Firebase persistence (optional)</h2>
+  <p>Fill your Firebase config and use the buttons to save/load all text areas.<br>
+     You need a Firestore database and anonymous auth enabled.</p>
+  <label>firebaseConfig (JSON)</label>
+  <textarea id="firebaseConfigText">
+{
+  "apiKey": "YOUR_API_KEY",
+  "authDomain": "YOUR_PROJECT_ID.firebaseapp.com",
+  "projectId": "YOUR_PROJECT_ID",
+  "storageBucket": "YOUR_PROJECT_ID.appspot.com",
+  "messagingSenderId": "YOUR_SENDER_ID",
+  "appId": "YOUR_APP_ID"
+}
+  </textarea>
+  <button onclick="initFirebase()">Init Firebase</button>
+  <button onclick="saveToFirebase()">Save current data to Firebase</button>
+  <button onclick="loadFromFirebase()">Load data from Firebase</button>
+  <pre id="fbStatus"></pre>
+</div>
+
+<!-- Firebase (compat) SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <script>
-// ---------- Complex number utilities ----------
+// ---------- Complex utilities ----------
 function C(re, im) { return {re: re, im: im}; }
 function cAdd(a, b) { return {re: a.re + b.re, im: a.im + b.im}; }
 function cSub(a, b) { return {re: a.re - b.re, im: a.im - b.im}; }
@@ -112,13 +144,11 @@ function jonesFromLib(tEx, tEy, thetaRad) {
   const s2 = s*s;
   const cs = c*s;
 
-  // Jxx = a c^2 + b s^2
+  // a = tEx, b = tEy
   const Jxx = cAdd( cMulReal(tEx, c2), cMulReal(tEy, s2) );
-  // Jxy = (b - a) c s
   const diff = cSub(tEy, tEx);
   const Jxy = cMulReal(diff, cs);
   const Jyx = {re: Jxy.re, im: Jxy.im};
-  // Jyy = a s^2 + b c^2
   const Jyy = cAdd( cMulReal(tEx, s2), cMulReal(tEy, c2) );
 
   return {Jxx, Jxy, Jyx, Jyy};
@@ -161,8 +191,9 @@ function runSimulation() {
       Einx = C(invSqrt2,0); Einy = C(0, invSqrt2); // (1, +i)/√2
     }
 
-    // 4) Diffraction orders of interest
+    // 4) Diffraction orders of interest (including 0,0)
     const orders = [
+      {name: "(0, 0)",  m:  0, n:  0},
       {name: "(+2, 0)", m:  2, n:  0},
       {name: "(-2, 0)", m: -2, n:  0},
       {name: "(0, +2)", m:  0, n:  2},
@@ -220,28 +251,169 @@ function runSimulation() {
     // 6) Compute intensities
     const intensities = [];
     let Imax = 0;
+    let Itot = 0;
     for (let k = 0; k < orders.length; k++) {
       const I = cAbs2(amps[k].Ex) + cAbs2(amps[k].Ey);
       intensities.push(I);
       if (I > Imax) Imax = I;
+      Itot += I;
     }
 
-    // 7) Print results
+    // 7) Print results with two normalizations
     let txt = "";
     txt += "Input polarization: " + pol + "\n\n";
-    txt += "Order    Raw Intensity    Normalized (I/I_max)\n";
-    txt += "----------------------------------------------\n";
+    txt += "Order     Raw Intensity     I/I_max    I/sum(I)\n";
+    txt += "-----------------------------------------------\n";
     for (let k = 0; k < orders.length; k++) {
       const I = intensities[k];
-      const norm = (Imax > 0) ? (I / Imax) : 0;
-      txt += `${orders[k].name.padEnd(9)}  ${I.toExponential(3).padStart(13)}      ${norm.toFixed(3)}\n`;
+      const nMax = (Imax > 0) ? (I / Imax) : 0;
+      const nSum = (Itot > 0) ? (I / Itot) : 0;
+      txt += `${orders[k].name.padEnd(9)} ${I.toExponential(3).padStart(14)}  ${nMax.toFixed(3).padStart(7)}  ${nSum.toFixed(3).padStart(8)}\n`;
     }
-
+    txt += "\nCheck: sum_{orders} I/sum(I) = " + (Itot>0 ? "1.000" : "0.000") + "\n";
     out.textContent = txt;
+
+    drawFarField(orders, intensities, Itot);
 
   } catch (e) {
     out.textContent = "Error: " + e.message;
+    const ctx = document.getElementById("farCanvas").getContext("2d");
+    ctx.clearRect(0,0,400,400);
   }
+}
+
+// ---------- Far-field visualization ----------
+function drawFarField(orders, intensities, Itot) {
+  const canvas = document.getElementById("farCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const cx = canvas.width/2;
+  const cy = canvas.height/2;
+  const scale = 50;  // pixels per diffraction order
+  const maxRadius = 25;
+
+  // draw axes
+  ctx.strokeStyle = "#cccccc";
+  ctx.beginPath();
+  ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy);
+  ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height);
+  ctx.stroke();
+
+  // draw each order
+  for (let k = 0; k < orders.length; k++) {
+    const m = orders[k].m;
+    const n = orders[k].n;
+    const I = intensities[k];
+    const frac = (Itot>0) ? (I/Itot) : 0;
+    const r = maxRadius * Math.sqrt(frac); // radius ~ sqrt(I) for visibility
+
+    const x = cx + m*scale;
+    const y = cy - n*scale;
+
+    // circle
+    ctx.beginPath();
+    ctx.fillStyle = "rgba(0,0,255,0.3)";
+    ctx.strokeStyle = "rgba(0,0,180,0.9)";
+    ctx.arc(x,y, r, 0, 2*Math.PI);
+    ctx.fill();
+    ctx.stroke();
+
+    // label
+    ctx.fillStyle = "#000000";
+    ctx.font = "10px Arial";
+    ctx.fillText(orders[k].name, x-18, y- (r+4));
+  }
+}
+
+// ---------- Firebase persistence ----------
+let fbApp = null;
+let fbAuth = null;
+let fbDB = null;
+let fbUserId = null;
+
+function initFirebase() {
+  const status = document.getElementById("fbStatus");
+  try {
+    const cfgText = document.getElementById("firebaseConfigText").value;
+    const cfg = JSON.parse(cfgText);
+
+    fbApp = firebase.initializeApp(cfg);
+    fbAuth = firebase.auth();
+    fbDB   = firebase.firestore();
+
+    fbAuth.signInAnonymously()
+      .then(cred => {
+        fbUserId = cred.user.uid;
+        status.textContent = "Firebase initialized. Anonymous UID: " + fbUserId;
+      })
+      .catch(err => {
+        status.textContent = "Auth error: " + err.message;
+      });
+  } catch (e) {
+    status.textContent = "Config parse/init error: " + e.message;
+  }
+}
+
+function collectAllTextareas() {
+  return {
+    phiXText: document.getElementById("phiXText").value,
+    phiYText: document.getElementById("phiYText").value,
+    TxText: document.getElementById("TxText").value,
+    TyText: document.getElementById("TyText").value,
+    LdesignText: document.getElementById("LdesignText").value,
+    WdesignText: document.getElementById("WdesignText").value,
+    thetaText: document.getElementById("thetaText").value
+  };
+}
+
+function fillAllTextareas(data) {
+  if (!data) return;
+  document.getElementById("phiXText").value = data.phiXText || "";
+  document.getElementById("phiYText").value = data.phiYText || "";
+  document.getElementById("TxText").value   = data.TxText   || "";
+  document.getElementById("TyText").value   = data.TyText   || "";
+  document.getElementById("LdesignText").value = data.LdesignText || "";
+  document.getElementById("WdesignText").value = data.WdesignText || "";
+  document.getElementById("thetaText").value   = data.thetaText   || "";
+}
+
+function saveToFirebase() {
+  const status = document.getElementById("fbStatus");
+  if (!fbDB || !fbUserId) {
+    status.textContent = "Firebase not initialized or user not signed in.";
+    return;
+  }
+  const data = collectAllTextareas();
+  fbDB.collection("metasurfaceConfigs").doc(fbUserId)
+    .set(data)
+    .then(() => {
+      status.textContent = "Saved to Firestore for user " + fbUserId;
+    })
+    .catch(err => {
+      status.textContent = "Save error: " + err.message;
+    });
+}
+
+function loadFromFirebase() {
+  const status = document.getElementById("fbStatus");
+  if (!fbDB || !fbUserId) {
+    status.textContent = "Firebase not initialized or user not signed in.";
+    return;
+  }
+  fbDB.collection("metasurfaceConfigs").doc(fbUserId)
+    .get()
+    .then(doc => {
+      if (doc.exists) {
+        fillAllTextareas(doc.data());
+        status.textContent = "Loaded config from Firestore.";
+      } else {
+        status.textContent = "No saved config found for this user.";
+      }
+    })
+    .catch(err => {
+      status.textContent = "Load error: " + err.message;
+    });
 }
 </script>
 </body>
