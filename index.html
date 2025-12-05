@@ -1,446 +1,480 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Metasurface Far-Field Simulator (10×10 from Dimensions)</title>
+  <meta charset="UTF-8" />
+  <title>Metasurface 10×10 Far-Field Simulator (6 Polarizations)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 16px;
-      background: #f5f5f5;
+      margin: 20px;
     }
     h1, h2, h3 {
-      margin-top: 12px;
-      margin-bottom: 6px;
+      margin-top: 1.2em;
     }
-    .section {
-      background: #ffffff;
-      padding: 12px;
-      margin-bottom: 16px;
-      border-radius: 8px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .panel {
+      border: 1px solid #ccc;
+      padding: 10px;
+      flex: 1 1 300px;
+      min-width: 280px;
     }
     textarea {
       width: 100%;
-      min-height: 80px;
-      font-family: Consolas, monospace;
+      height: 120px;
+      font-family: monospace;
       font-size: 12px;
-      white-space: pre;
     }
-    label {
-      font-weight: bold;
-      display: block;
-      margin-top: 6px;
-      margin-bottom: 2px;
+    input[type="text"] {
+      width: 100%;
     }
     button {
-      margin: 4px 4px 4px 0;
-      padding: 6px 12px;
-      border-radius: 4px;
-      border: 1px solid #999;
-      background: #eee;
+      padding: 8px 14px;
+      margin-top: 10px;
       cursor: pointer;
-    }
-    button:hover { background: #ddd; }
-    #heatmap {
-      border: 1px solid #444;
-      margin-top: 8px;
     }
     table {
       border-collapse: collapse;
-      margin-top: 8px;
+      font-size: 11px;
     }
     th, td {
-      border: 1px solid #ccc;
+      border: 1px solid #aaa;
       padding: 2px 4px;
-      font-size: 11px;
       text-align: right;
     }
-    .status {
-      font-size: 12px;
-      color: #333;
-      margin-top: 4px;
-    }
-    .small-input { width: 80px; }
-    .row-flex {
+    .heatmap-container {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
-    .col {
-      flex: 1;
-      min-width: 260px;
+    .heatmap-block {
+      text-align: center;
     }
-    select {
-      padding: 3px 6px;
-      margin-left: 4px;
+    canvas {
+      border: 1px solid #aaa;
+    }
+    .note {
+      font-size: 11px;
+      color: #555;
     }
   </style>
 </head>
 <body>
-  <h1>Metasurface Far-Field Simulator (10×10 from Length/Width/Rotation)</h1>
+  <h1>Metasurface 10×10 Far-Field Simulator (6 Polarizations)</h1>
+  <p>
+    Paste your 24×24 library (<strong>φx, φy, Tx, Ty</strong>) and your 10×10 metasurface design
+    (<strong>L, W, θ</strong>), choose an input polarization, then click
+    <strong>Run Simulation</strong>.
+  </p>
 
-  <!-- ============ 1. LIBRARY ============ -->
-  <div class="section">
-    <h2>1. 400 nm Library (24×24) — φx, φy, Tx, Ty</h2>
-    <p>Paste your 24×24 matrices (24 lines × 24 numbers each). Grid assumed: L,W = 50:10:280 nm.</p>
+  <div class="row">
+    <div class="panel">
+      <h2>Library (24×24)</h2>
+      <p class="note">
+        Each textarea expects 24 rows, each row 24 numbers separated by spaces/tabs.
+        Angles in <b>radians</b>, transmissions 0–1.
+      </p>
+      <label>Ex Phase φx (24×24):</label>
+      <textarea id="phiX_2D" placeholder="Row1: 3.98 4.01 ...&#10;Row2: ..."></textarea>
 
-    <div class="row-flex">
-      <div class="col">
-        <label for="libPhiX">φx (Ex phase, rad, 24×24)</label>
-        <textarea id="libPhiX"></textarea>
-      </div>
-      <div class="col">
-        <label for="libPhiY">φy (Ey phase, rad, 24×24)</label>
-        <textarea id="libPhiY"></textarea>
-      </div>
+      <label>Ey Phase φy (24×24):</label>
+      <textarea id="phiY_2D" placeholder="Row1: 3.98 4.01 ..."></textarea>
+
+      <label>Tx (Ex transmission) (24×24):</label>
+      <textarea id="Tx_2D" placeholder="Row1: 0.96 0.96 ..."></textarea>
+
+      <label>Ty (Ey transmission) (24×24):</label>
+      <textarea id="Ty_2D" placeholder="Row1: 0.96 0.96 ..."></textarea>
+
+      <label>Length grid (nm) (1×24, default 50:10:280):</label>
+      <input id="L_list" type="text" value="50 60 70 80 90 100 110 120 130 140 150 160 170 180 190 200 210 220 230 240 250 260 270 280" />
+
+      <label>Width grid (nm) (1×24, default 50:10:280):</label>
+      <input id="W_list" type="text" value="50 60 70 80 90 100 110 120 130 140 150 160 170 180 190 200 210 220 230 240 250 260 270 280" />
     </div>
 
-    <div class="row-flex">
-      <div class="col">
-        <label for="libTx">Tx (Ex amplitude, 0–1, 24×24)</label>
-        <textarea id="libTx"></textarea>
-      </div>
-      <div class="col">
-        <label for="libTy">Ty (Ey amplitude, 0–1, 24×24)</label>
-        <textarea id="libTy"></textarea>
-      </div>
-    </div>
-  </div>
+    <div class="panel">
+      <h2>Metasurface Design (10×10)</h2>
+      <p class="note">
+        Each textarea expects 10 rows, each row 10 numbers (nm or degrees) separated by spaces/tabs.
+      </p>
 
-  <!-- ============ 2. DESIGN ============ -->
-  <div class="section">
-    <h2>2. Metasurface Design (10×10) — Length, Width, Rotation</h2>
-    <p>Paste your 10×10 maps (10 lines × 10 numbers each) for length, width and rotation.</p>
+      <label>L design (nm) (10×10):</label>
+      <textarea id="L_design" placeholder="L[0,0] L[0,1] ... L[0,9]&#10;...&#10;L[9,0] ... L[9,9]"></textarea>
 
-    <div class="row-flex">
-      <div class="col">
-        <label for="Lmap">Length L (nm, 10×10)</label>
-        <textarea id="Lmap"></textarea>
-      </div>
-      <div class="col">
-        <label for="Wmap">Width W (nm, 10×10)</label>
-        <textarea id="Wmap"></textarea>
-      </div>
-    </div>
-    <div class="row-flex">
-      <div class="col">
-        <label for="Rotmap">Rotation θ (deg, 10×10)</label>
-        <textarea id="Rotmap"></textarea>
-      </div>
-    </div>
-  </div>
+      <label>W design (nm) (10×10):</label>
+      <textarea id="W_design" placeholder="W[0,0] W[0,1] ... W[0,9]&#10;...&#10;W[9,0] ... W[9,9]"></textarea>
 
-  <!-- ============ 3. SIM SETTINGS ============ -->
-  <div class="section">
-    <h2>3. Simulation Settings</h2>
+      <label>θ design (deg) (10×10) – rotation of each pillar:</label>
+      <textarea id="Theta_design" placeholder="Theta[0,0] ... Theta[0,9]&#10;...&#10;Theta[9,0] ... Theta[9,9]"></textarea>
 
-    <label>
-      Input polarization:
-      <select id="inputPol">
-        <option value="Ex">Ex</option>
-        <option value="Ey">Ey</option>
+      <label>Input Polarization:</label>
+      <select id="polarization">
+        <option value="Ex">Ex (H)</option>
+        <option value="Ey">Ey (V)</option>
         <option value="P45">+45°</option>
-        <option value="M45">−45°</option>
+        <option value="M45">-45°</option>
         <option value="RCP">RCP</option>
         <option value="LCP">LCP</option>
       </select>
-    </label>
 
-    <label>
-      Max diffraction order |m|,|n|:
-      <input id="maxOrder" type="number" value="8" class="small-input">
-    </label>
+      <button onclick="runSimulation()">Run Simulation</button>
 
-    <button id="btnRun">Run Simulation</button>
-    <div id="simStatus" class="status"></div>
+      <p id="energyInfo" class="note"></p>
+    </div>
   </div>
 
-  <!-- ============ 4. RESULTS ============ -->
-  <div class="section">
-    <h2>4. Far-Field Results</h2>
-    <p>Intensity normalized so that max over all (m,n) is 1.</p>
-    <div id="onAxisInfo" class="status"></div>
-    <canvas id="heatmap" width="400" height="400"></canvas>
-    <div id="intensityTableContainer"></div>
+  <h2>Far Field Over Diffraction Orders m,n ∈ [-8 .. +8]</h2>
+  <p class="note">
+    Intensities are normalized so that the sum over all (m,n) = 1 (energy normalized).<br/>
+    We show three maps: total |Ex|²+|Ey|², Ex-only, Ey-only.
+  </p>
+
+  <div class="heatmap-container">
+    <div class="heatmap-block">
+      <h3>Total Intensity</h3>
+      <canvas id="canvasTotal" width="250" height="250"></canvas>
+      <div id="tableTotal"></div>
+    </div>
+    <div class="heatmap-block">
+      <h3>Ex Channel</h3>
+      <canvas id="canvasEx" width="250" height="250"></canvas>
+      <div id="tableEx"></div>
+    </div>
+    <div class="heatmap-block">
+      <h3>Ey Channel</h3>
+      <canvas id="canvasEy" width="250" height="250"></canvas>
+      <div id="tableEy"></div>
+    </div>
   </div>
 
-  <!-- ============ SCRIPT ============ -->
   <script>
-    /********** Helpers: parse matrix **********/
+    // ======== Utility: parse whitespace-separated matrix text into 2D array ========
     function parseMatrix(text, expectedRows, expectedCols) {
-      const rows = text.trim().split(/[\r\n]+/).filter(r => r.trim().length > 0);
-      if (rows.length !== expectedRows) {
-        throw new Error("Expected " + expectedRows + " rows, got " + rows.length);
+      const lines = text.trim().split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (expectedRows && lines.length !== expectedRows) {
+        throw new Error("Expected " + expectedRows + " rows, got " + lines.length);
       }
       const mat = [];
-      for (let i = 0; i < expectedRows; i++) {
-        const parts = rows[i].trim().split(/[\s,]+/).filter(p => p.length > 0);
-        if (parts.length !== expectedCols) {
-          throw new Error("Row " + (i+1) + ": expected " + expectedCols + " columns, got " + parts.length);
+      for (let r = 0; r < lines.length; r++) {
+        const parts = lines[r].trim().split(/[\s,]+/).filter(x => x.length > 0);
+        if (expectedCols && parts.length !== expectedCols) {
+          throw new Error("Row " + (r+1) + " expected " + expectedCols + " columns, got " + parts.length);
         }
-        mat[i] = parts.map(Number);
+        mat.push(parts.map(Number));
       }
       return mat;
     }
 
-    /********** Simple complex numbers **********/
-    function c(re, im) { return {re, im}; }
-    function cAdd(a, b) { return {re: a.re + b.re, im: a.im + b.im}; }
-    function cMul(a, b) {
-      return {
-        re: a.re*b.re - a.im*b.im,
-        im: a.re*b.im + a.im*b.re
-      };
-    }
-    function cExp(phi) {
-      return {re: Math.cos(phi), im: Math.sin(phi)};
-    }
-    function cAbs2(a) { return a.re*a.re + a.im*a.im; }
-
-    // a*b + c0
-    function cAddMul(a, b, c0) {
-      return cAdd(cMul(a,b), c0);
-    }
-
-    /********** Library + design getters **********/
-    function getLibraryMatrices() {
-      const phiX = parseMatrix(document.getElementById("libPhiX").value, 24, 24);
-      const phiY = parseMatrix(document.getElementById("libPhiY").value, 24, 24);
-      const Tx   = parseMatrix(document.getElementById("libTx").value,   24, 24);
-      const Ty   = parseMatrix(document.getElementById("libTy").value,   24, 24);
-      return { phiX, phiY, Tx, Ty };
-    }
-
-    function getDesignMatrices() {
-      const Lmap   = parseMatrix(document.getElementById("Lmap").value,   10, 10);
-      const Wmap   = parseMatrix(document.getElementById("Wmap").value,   10, 10);
-      const Rotmap = parseMatrix(document.getElementById("Rotmap").value, 10, 10);
-      return { Lmap, Wmap, Rotmap };
-    }
-
-    // Map (L,W) to nearest index in 50:10:280 grid
-    function libIndexFromDimensions(L_nm, W_nm) {
-      let i = Math.round((L_nm - 50) / 10);
-      let j = Math.round((W_nm - 50) / 10);
-      if (i < 0) i = 0; if (i > 23) i = 23;
-      if (j < 0) j = 0; if (j > 23) j = 23;
-      return { i, j };
-    }
-
-    /********** Per-pillar Jones and output fields **********/
-    function computePillarFields(pol, library, design) {
-      const Nx = 10, Ny = 10;
-      const { phiX, phiY, Tx, Ty } = library;
-      const { Lmap, Wmap, Rotmap } = design;
-
-      // Input Jones vector (complex) for chosen polarization
-      const invSqrt2 = 1/Math.sqrt(2);
-      let Jin;
-      switch (pol) {
-        case "Ex":  Jin = [c(1,0), c(0,0)]; break;
-        case "Ey":  Jin = [c(0,0), c(1,0)]; break;
-        case "P45": Jin = [c(invSqrt2,0), c(invSqrt2,0)]; break;
-        case "M45": Jin = [c(invSqrt2,0), c(-invSqrt2,0)]; break;
-        case "RCP": Jin = [c(invSqrt2,0), c(0,-invSqrt2)]; break; // (1, -i)/√2
-        case "LCP": Jin = [c(invSqrt2,0), c(0, invSqrt2)]; break; // (1,  i)/√2
-        default:    Jin = [c(1,0), c(0,0)];
+    function parseVector(text, expectedLen) {
+      const parts = text.trim().split(/[\s,]+/).filter(x => x.length > 0);
+      if (expectedLen && parts.length !== expectedLen) {
+        throw new Error("Expected " + expectedLen + " entries, got " + parts.length);
       }
+      return parts.map(Number);
+    }
 
-      const Ex_out = [];
-      const Ey_out = [];
-      for (let px = 0; px < Nx; px++) {
-        Ex_out[px] = new Array(Ny);
-        Ey_out[px] = new Array(Ny);
-        for (let py = 0; py < Ny; py++) {
-          const L_nm = Lmap[px][py];
-          const W_nm = Wmap[px][py];
-          const theta_deg = Rotmap[px][py];
-
-          const { i, j } = libIndexFromDimensions(L_nm, W_nm);
-          const phx = phiX[i][j];
-          const phy = phiY[i][j];
-          const tx  = Tx[i][j];
-          const ty  = Ty[i][j];
-
-          // diag(tx e^{iφx}, ty e^{iφy})
-          let jxx = cExp(phx); jxx.re *= tx; jxx.im *= tx;
-          let jyy = cExp(phy); jyy.re *= ty; jyy.im *= ty;
-
-          const theta = theta_deg * Math.PI / 180;
-          const cth  = Math.cos(theta);
-          const sth  = Math.sin(theta);
-          const cthm = Math.cos(-theta);
-          const sthm = Math.sin(-theta);
-
-          // R(θ)
-          const r11 = cth,  r12 = -sth;
-          const r21 = sth,  r22 =  cth;
-
-          // M = diag(jxx,jyy)*R(θ)
-          const m11 = cMul(jxx, c(r11,0));
-          const m12 = cMul(jxx, c(r12,0));
-          const m21 = cMul(jyy, c(r21,0));
-          const m22 = cMul(jyy, c(r22,0));
-
-          // R(-θ)
-          const rm11 = c(cthm,0), rm12 = c(-sthm,0);
-          const rm21 = c(sthm,0), rm22 = c(cthm,0);
-
-          // J = R(-θ)*M
-          const J11 = cAddMul(rm11, m11, cMul(rm12, m21));
-          const J12 = cAddMul(rm11, m12, cMul(rm12, m22));
-          const J21 = cAddMul(rm21, m11, cMul(rm22, m21));
-          const J22 = cAddMul(rm21, m12, cMul(rm22, m22));
-
-          // E_out = J * Jin
-          const Ex_in = Jin[0];
-          const Ey_in = Jin[1];
-          const Ex_tmp = cAddMul(J11, Ex_in, cMul(J12, Ey_in));
-          const Ey_tmp = cAddMul(J21, Ex_in, cMul(J22, Ey_in));
-
-          Ex_out[px][py] = Ex_tmp;
-          Ey_out[px][py] = Ey_tmp;
+    function findIndexForValue(list, val) {
+      // exact match, or nearest
+      let bestIdx = 0;
+      let bestDiff = Math.abs(list[0] - val);
+      for (let i = 1; i < list.length; i++) {
+        const d = Math.abs(list[i] - val);
+        if (d < bestDiff) {
+          bestDiff = d;
+          bestIdx = i;
         }
       }
-      return { Ex_out, Ey_out };
+      return bestIdx;
     }
 
-    /********** Far-field with vector addition **********/
-    function computeFarFieldVector(Ex_out, Ey_out, maxOrder) {
-      const Nx = Ex_out.length;
-      const Ny = Ex_out[0].length;
-      const size = 2*maxOrder + 1;
+    // ======== Build output fields including rotation θ ========
+    // Returns {Ex: Nx×Ny complex, Ey: Nx×Ny complex}
+    function buildFields(library, design, pol) {
+      const { phiX_2D, phiY_2D, Tx_2D, Ty_2D, L_LIST, W_LIST } = library;
+      const { L_design, W_design, Theta_design } = design;
 
-      const intensities = [];
-      for (let i = 0; i < size; i++) {
-        intensities[i] = new Array(size).fill(0);
+      const Nx = 10;
+      const Ny = 10;
+
+      const Ex = Array.from({ length: Nx }, () =>
+        Array.from({ length: Ny }, () => ({ re: 0, im: 0 }))
+      );
+      const Ey = Array.from({ length: Nx }, () =>
+        Array.from({ length: Ny }, () => ({ re: 0, im: 0 }))
+      );
+
+      const invRoot2 = 1 / Math.sqrt(2);
+
+      for (let p = 0; p < Nx; p++) {
+        for (let q = 0; q < Ny; q++) {
+          const L_nm = L_design[p][q];
+          const W_nm = W_design[p][q];
+
+          const iL = findIndexForValue(L_LIST, L_nm);
+          const jW = findIndexForValue(W_LIST, W_nm);
+
+          const phiX = phiX_2D[iL][jW];
+          const phiY = phiY_2D[iL][jW];
+          const Tx = Tx_2D[iL][jW];
+          const Ty = Ty_2D[iL][jW];
+
+          // Input Jones vector
+          let Ex_in_re = 0, Ex_in_im = 0;
+          let Ey_in_re = 0, Ey_in_im = 0;
+
+          if (pol === "Ex") {
+            Ex_in_re = 1;
+          } else if (pol === "Ey") {
+            Ey_in_re = 1;
+          } else if (pol === "P45") {
+            Ex_in_re = invRoot2;
+            Ey_in_re = invRoot2;
+          } else if (pol === "M45") {
+            Ex_in_re = invRoot2;
+            Ey_in_re = -invRoot2;
+          } else if (pol === "RCP") {
+            // (1/√2)[1, -i]
+            Ex_in_re = invRoot2;
+            Ey_in_im = -invRoot2;
+          } else if (pol === "LCP") {
+            // (1/√2)[1, +i]
+            Ex_in_re = invRoot2;
+            Ey_in_im = invRoot2;
+          }
+
+          // Rotation θ
+          const theta_deg = Theta_design[p][q] || 0;
+          const theta = theta_deg * Math.PI / 180;
+          const c = Math.cos(theta);
+          const s = Math.sin(theta);
+
+          // 1) Rotate input to local frame: E_local = R(θ)*E_in
+          const Ex_loc_re =  c * Ex_in_re - s * Ey_in_re;
+          const Ey_loc_re =  s * Ex_in_re + c * Ey_in_re;
+
+          const Ex_loc_im =  c * Ex_in_im - s * Ey_in_im;
+          const Ey_loc_im =  s * Ex_in_im + c * Ey_in_im;
+
+          // 2) Apply diagonal diag(Tx e^{iφx}, Ty e^{iφy}) in local frame
+          const cx = Math.cos(phiX), sx = Math.sin(phiX);
+          const cy = Math.cos(phiY), sy = Math.sin(phiY);
+
+          const Ex_loc_out_re = Tx * (Ex_loc_re * cx - Ex_loc_im * sx);
+          const Ex_loc_out_im = Tx * (Ex_loc_re * sx + Ex_loc_im * cx);
+
+          const Ey_loc_out_re = Ty * (Ey_loc_re * cy - Ey_loc_im * sy);
+          const Ey_loc_out_im = Ty * (Ey_loc_re * sy + Ey_loc_im * cy);
+
+          // 3) Rotate back to lab frame: E_out = R(-θ)*E_loc_out
+          const Ex_out_re =  c * Ex_loc_out_re + s * Ey_loc_out_re;
+          const Ey_out_re = -s * Ex_loc_out_re + c * Ey_loc_out_re;
+
+          const Ex_out_im =  c * Ex_loc_out_im + s * Ey_loc_out_im;
+          const Ey_out_im = -s * Ex_loc_out_im + c * Ey_loc_out_im;
+
+          Ex[p][q] = { re: Ex_out_re, im: Ex_out_im };
+          Ey[p][q] = { re: Ey_out_re, im: Ey_out_im };
+        }
       }
 
-      let maxI = 0;
-      let I00  = 0;
+      return { Ex, Ey };
+    }
 
-      for (let mi = -maxOrder; mi <= maxOrder; mi++) {
-        for (let ni = -maxOrder; ni <= maxOrder; ni++) {
-          let Fx = c(0,0);
-          let Fy = c(0,0);
-          for (let px = 0; px < Nx; px++) {
-            for (let py = 0; py < Ny; py++) {
-              const phase = -2 * Math.PI * (mi*px/Nx + ni*py/Ny);
-              const w = cExp(phase);
-              Fx = cAdd(Fx, cMul(Ex_out[px][py], w));
-              Fy = cAdd(Fy, cMul(Ey_out[px][py], w));
+    // ======== Compute far field via discrete FT over orders m,n in [-M..M] ========
+    function computeFarField(Ex, Ey, M) {
+      const Nx = Ex.length;
+      const Ny = Ex[0].length;
+      const size = 2 * M + 1;
+
+      const I_total = Array.from({ length: size }, () => Array(size).fill(0));
+      const I_Ex    = Array.from({ length: size }, () => Array(size).fill(0));
+      const I_Ey    = Array.from({ length: size }, () => Array(size).fill(0));
+
+      const normFactor = 1 / Math.sqrt(Nx * Ny);
+
+      // Real-space power (Parseval check)
+      let P_real = 0;
+      for (let p = 0; p < Nx; p++) {
+        for (let q = 0; q < Ny; q++) {
+          const Expq = Ex[p][q];
+          const Eypq = Ey[p][q];
+          const mag2_Ex = Expq.re * Expq.re + Expq.im * Expq.im;
+          const mag2_Ey = Eypq.re * Eypq.re + Eypq.im * Eypq.im;
+          P_real += mag2_Ex + mag2_Ey;
+        }
+      }
+
+      for (let mi = -M; mi <= M; mi++) {
+        for (let ni = -M; ni <= M; ni++) {
+          let Exk_re = 0, Exk_im = 0;
+          let Eyk_re = 0, Eyk_im = 0;
+
+          for (let p = 0; p < Nx; p++) {
+            for (let q = 0; q < Ny; q++) {
+              const Expq = Ex[p][q];
+              const Eypq = Ey[p][q];
+
+              const phase = -2 * Math.PI * (mi * p / Nx + ni * q / Ny);
+              const cp = Math.cos(phase), sp = Math.sin(phase);
+
+              // Multiply Ex(p,q) * e^{i phase}
+              const Ex_re_tmp = Expq.re * cp - Expq.im * sp;
+              const Ex_im_tmp = Expq.re * sp + Expq.im * cp;
+
+              const Ey_re_tmp = Eypq.re * cp - Eypq.im * sp;
+              const Ey_im_tmp = Eypq.re * sp + Eypq.im * cp;
+
+              Exk_re += Ex_re_tmp;
+              Exk_im += Ex_im_tmp;
+              Eyk_re += Ey_re_tmp;
+              Eyk_im += Ey_im_tmp;
             }
           }
-          const I = cAbs2(Fx) + cAbs2(Fy);
-          const ii = mi + maxOrder;
-          const jj = ni + maxOrder;
-          intensities[ii][jj] = I;
-          if (I > maxI) maxI = I;
-          if (mi === 0 && ni === 0) I00 = I;
+
+          Exk_re *= normFactor;
+          Exk_im *= normFactor;
+          Eyk_re *= normFactor;
+          Eyk_im *= normFactor;
+
+          const mag2_Ex = Exk_re * Exk_re + Exk_im * Exk_im;
+          const mag2_Ey = Eyk_re * Eyk_re + Eyk_im * Eyk_im;
+          const mag2_tot = mag2_Ex + mag2_Ey;
+
+          const i = mi + M;
+          const j = ni + M;
+          I_Ex[i][j] = mag2_Ex;
+          I_Ey[i][j] = mag2_Ey;
+          I_total[i][j] = mag2_tot;
         }
       }
 
-      if (maxI > 0) {
-        for (let i = 0; i < size; i++) {
-          for (let j = 0; j < size; j++) {
-            intensities[i][j] /= maxI;
-          }
-        }
-        I00 /= maxI;
-      }
-
-      return { intensities, I00 };
-    }
-
-    /********** Heatmap + table **********/
-    function drawHeatmap(intensities, canvas, maxOrder) {
-      const ctx = canvas.getContext("2d");
-      const size = intensities.length;
-      const W = canvas.width;
-      const H = canvas.height;
-      ctx.clearRect(0,0,W,H);
-
-      const cellW = W / size;
-      const cellH = H / size;
-
+      // Normalize so sum(I_total) = 1
+      let P_k = 0;
       for (let i = 0; i < size; i++) {
         for (let j = 0; j < size; j++) {
-          const val = intensities[i][j];
-          const v = Math.max(0, Math.min(1, val));
-          const r = Math.floor(255 * v);
-          const g = 0;
-          const b = Math.floor(255 * (1 - v));
-          ctx.fillStyle = `rgb(${r},${g},${b})`;
-          ctx.fillRect(j*cellW, i*cellH, cellW, cellH);
+          P_k += I_total[i][j];
+        }
+      }
+      if (P_k > 0) {
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            I_total[i][j] /= P_k;
+            I_Ex[i][j]    /= P_k;
+            I_Ey[i][j]    /= P_k;
+          }
         }
       }
 
-      // indicate m=0 and n=0
-      const z = maxOrder + 0.5;
-      ctx.strokeStyle = "white";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(z*cellW, 0);   ctx.lineTo(z*cellW, H);
-      ctx.moveTo(0, z*cellH);   ctx.lineTo(W, z*cellH);
-      ctx.stroke();
+      return { I_total, I_Ex, I_Ey, P_real, P_k };
     }
 
-    function createIntensityTable(intensities, maxOrder) {
-      const size = intensities.length;
-      let html = "<table><thead><tr><th>m \\ n</th>";
-      for (let n = -maxOrder; n <= maxOrder; n++) {
+    // ======== Render numeric table ========
+    function renderTable(intensity, elementId, M) {
+      const size = intensity.length;
+      let html = "<table><tr><th>m\\n</th>";
+      for (let n = -M; n <= M; n++) {
         html += "<th>" + n + "</th>";
       }
-      html += "</tr></thead><tbody>";
-      for (let m = -maxOrder; m <= maxOrder; m++) {
+      html += "</tr>";
+      for (let i = 0; i < size; i++) {
+        const m = i - M;
         html += "<tr><th>" + m + "</th>";
-        for (let n = -maxOrder; n <= maxOrder; n++) {
-          const ii = m + maxOrder;
-          const jj = n + maxOrder;
-          html += "<td>" + intensities[ii][jj].toFixed(3) + "</td>";
+        for (let j = 0; j < size; j++) {
+          const val = intensity[i][j];
+          html += "<td>" + val.toFixed(3) + "</td>";
         }
         html += "</tr>";
       }
-      html += "</tbody></table>";
-      return html;
+      html += "</table>";
+      document.getElementById(elementId).innerHTML = html;
     }
 
-    /********** Main: runSimulation **********/
-    function runSimulation() {
-      const simStatus = document.getElementById("simStatus");
-      const onAxisInfo = document.getElementById("onAxisInfo");
-      const tblDiv = document.getElementById("intensityTableContainer");
-      const canvas = document.getElementById("heatmap");
+    // ======== Render simple heatmap on canvas ========
+    function renderHeatmap(intensity, canvasId) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext("2d");
+      const size = intensity.length;
+      const w = canvas.width;
+      const h = canvas.height;
+      const cellW = w / size;
+      const cellH = h / size;
 
-      simStatus.textContent = "";
-      onAxisInfo.textContent = "";
-      tblDiv.innerHTML = "";
-
-      const pol = document.getElementById("inputPol").value;
-      const maxOrder = parseInt(document.getElementById("maxOrder").value, 10);
-      if (isNaN(maxOrder) || maxOrder < 0 || maxOrder > 12) {
-        simStatus.textContent = "Choose |m|,|n| between 0 and 12.";
+      // find max for scaling (after normalization sum=1, but distribution may be peaked)
+      let maxVal = 0;
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          if (intensity[i][j] > maxVal) maxVal = intensity[i][j];
+        }
+      }
+      if (maxVal === 0) {
+        ctx.clearRect(0, 0, w, h);
         return;
       }
 
-      try {
-        const library = getLibraryMatrices();
-        const design  = getDesignMatrices();
-        const { Ex_out, Ey_out } = computePillarFields(pol, library, design);
-        const { intensities, I00 } = computeFarFieldVector(Ex_out, Ey_out, maxOrder);
-
-        drawHeatmap(intensities, canvas, maxOrder);
-        onAxisInfo.textContent = "(0,0) normalized intensity: " + I00.toFixed(3);
-        tblDiv.innerHTML = createIntensityTable(intensities, maxOrder);
-        simStatus.textContent = "Simulation complete.";
-      } catch (err) {
-        console.error(err);
-        simStatus.textContent = "Error: " + err.message;
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          const v = intensity[i][j] / maxVal; // 0..1
+          // grayscale: 0 -> white, 1 -> black
+          const shade = Math.round(255 * (1 - v));
+          ctx.fillStyle = "rgb(" + shade + "," + shade + "," + shade + ")";
+          ctx.fillRect(j * cellW, i * cellH, cellW, cellH);
+        }
       }
     }
 
-    document.getElementById("btnRun").addEventListener("click", runSimulation);
+    // ======== Main: run simulation ========
+    function runSimulation() {
+      try {
+        const phiX_2D = parseMatrix(document.getElementById("phiX_2D").value, 24, 24);
+        const phiY_2D = parseMatrix(document.getElementById("phiY_2D").value, 24, 24);
+        const Tx_2D   = parseMatrix(document.getElementById("Tx_2D").value,   24, 24);
+        const Ty_2D   = parseMatrix(document.getElementById("Ty_2D").value,   24, 24);
+
+        const L_LIST  = parseVector(document.getElementById("L_list").value, 24);
+        const W_LIST  = parseVector(document.getElementById("W_list").value, 24);
+
+        const L_design = parseMatrix(document.getElementById("L_design").value, 10, 10);
+        const W_design = parseMatrix(document.getElementById("W_design").value, 10, 10);
+        const Theta_design = parseMatrix(document.getElementById("Theta_design").value, 10, 10);
+
+        const pol = document.getElementById("polarization").value;
+
+        const library = { phiX_2D, phiY_2D, Tx_2D, Ty_2D, L_LIST, W_LIST };
+        const design  = { L_design, W_design, Theta_design };
+
+        const { Ex, Ey } = buildFields(library, design, pol);
+
+        const M = 8; // diffraction order range
+        const { I_total, I_Ex, I_Ey, P_real, P_k } = computeFarField(Ex, Ey, M);
+
+        // Energy check info
+        const info = `
+Real-space power Σ|E|² = ${P_real.toFixed(4)},
+k-space power ΣI = 1 (normalized),
+(unnormalized ΣI would be ≈ ${P_k.toFixed(4)}).
+        `;
+        document.getElementById("energyInfo").textContent = info;
+
+        // Render tables
+        renderTable(I_total, "tableTotal", M);
+        renderTable(I_Ex,    "tableEx",    M);
+        renderTable(I_Ey,    "tableEy",    M);
+
+        // Render heatmaps
+        renderHeatmap(I_total, "canvasTotal");
+        renderHeatmap(I_Ex,    "canvasEx");
+        renderHeatmap(I_Ey,    "canvasEy");
+
+      } catch (err) {
+        alert("Error: " + err.message);
+        console.error(err);
+      }
+    }
   </script>
 </body>
 </html>
