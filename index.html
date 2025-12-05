@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Metasurface Far-Field Simulator (10×10, Dim-Based)</title>
+  <title>Metasurface Far-Field Simulator (10×10 from Dimensions)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -41,9 +41,7 @@
       background: #eee;
       cursor: pointer;
     }
-    button:hover {
-      background: #ddd;
-    }
+    button:hover { background: #ddd; }
     #heatmap {
       border: 1px solid #444;
       margin-top: 8px;
@@ -63,9 +61,7 @@
       color: #333;
       margin-top: 4px;
     }
-    .small-input {
-      width: 80px;
-    }
+    .small-input { width: 80px; }
     .row-flex {
       display: flex;
       gap: 12px;
@@ -84,69 +80,60 @@
 <body>
   <h1>Metasurface Far-Field Simulator (10×10 from Length/Width/Rotation)</h1>
 
-  <!-- ===================== LIBRARY SECTION ===================== -->
+  <!-- ============ 1. LIBRARY ============ -->
   <div class="section">
     <h2>1. 400 nm Library (24×24) — φx, φy, Tx, Ty</h2>
-    <p>Paste your <b>24×24</b> matrices (24 lines, each line 24 numbers separated by spaces) for the unit-cell library.</p>
+    <p>Paste your 24×24 matrices (24 lines × 24 numbers each). Grid assumed: L,W = 50:10:280 nm.</p>
 
     <div class="row-flex">
       <div class="col">
-        <label for="libPhiX">φ<sub>x</sub> (Ex phase, rad, 24×24)</label>
-        <textarea id="libPhiX" placeholder="row1: 24 numbers&#10;row2: 24 numbers&#10;..."></textarea>
+        <label for="libPhiX">φx (Ex phase, rad, 24×24)</label>
+        <textarea id="libPhiX"></textarea>
       </div>
       <div class="col">
-        <label for="libPhiY">φ<sub>y</sub> (Ey phase, rad, 24×24)</label>
+        <label for="libPhiY">φy (Ey phase, rad, 24×24)</label>
         <textarea id="libPhiY"></textarea>
       </div>
     </div>
 
     <div class="row-flex">
       <div class="col">
-        <label for="libTx">T<sub>x</sub> (Ex amplitude, 0–1, 24×24)</label>
+        <label for="libTx">Tx (Ex amplitude, 0–1, 24×24)</label>
         <textarea id="libTx"></textarea>
       </div>
       <div class="col">
-        <label for="libTy">T<sub>y</sub> (Ey amplitude, 0–1, 24×24)</label>
+        <label for="libTy">Ty (Ey amplitude, 0–1, 24×24)</label>
         <textarea id="libTy"></textarea>
       </div>
     </div>
-
-    <button id="btnSaveLibrary">Save Library to Firebase</button>
-    <button id="btnLoadLibrary">Load Library from Firebase</button>
-    <div id="libraryStatus" class="status"></div>
   </div>
 
-  <!-- ===================== DESIGN SECTION ===================== -->
+  <!-- ============ 2. DESIGN ============ -->
   <div class="section">
     <h2>2. Metasurface Design (10×10) — Length, Width, Rotation</h2>
-    <p>Paste your <b>10×10</b> maps for each design parameter (10 lines, 10 numbers each).</p>
+    <p>Paste your 10×10 maps (10 lines × 10 numbers each) for length, width and rotation.</p>
 
     <div class="row-flex">
       <div class="col">
         <label for="Lmap">Length L (nm, 10×10)</label>
-        <textarea id="Lmap" placeholder="L in nm (e.g. between 50 and 280)"></textarea>
+        <textarea id="Lmap"></textarea>
       </div>
       <div class="col">
         <label for="Wmap">Width W (nm, 10×10)</label>
-        <textarea id="Wmap" placeholder="W in nm (e.g. between 50 and 280)"></textarea>
+        <textarea id="Wmap"></textarea>
       </div>
     </div>
-
     <div class="row-flex">
       <div class="col">
-        <label for="Rotmap">Rotation θ (degrees, 10×10)</label>
-        <textarea id="Rotmap" placeholder="Rotation angle of each pillar (deg)"></textarea>
+        <label for="Rotmap">Rotation θ (deg, 10×10)</label>
+        <textarea id="Rotmap"></textarea>
       </div>
     </div>
-
-    <button id="btnSaveDesign">Save Design to Firebase</button>
-    <button id="btnLoadDesign">Load Design from Firebase</button>
-    <div id="designStatus" class="status"></div>
   </div>
 
-  <!-- ===================== SIMULATION SECTION ===================== -->
+  <!-- ============ 3. SIM SETTINGS ============ -->
   <div class="section">
-    <h2>3. Simulation Settings & Run</h2>
+    <h2>3. Simulation Settings</h2>
 
     <label>
       Input polarization:
@@ -161,7 +148,7 @@
     </label>
 
     <label>
-      Max diffraction order |m|, |n| (integer, ≤ 8 recommended):
+      Max diffraction order |m|,|n|:
       <input id="maxOrder" type="number" value="8" class="small-input">
     </label>
 
@@ -169,161 +156,54 @@
     <div id="simStatus" class="status"></div>
   </div>
 
-  <!-- ===================== RESULTS SECTION ===================== -->
+  <!-- ============ 4. RESULTS ============ -->
   <div class="section">
     <h2>4. Far-Field Results</h2>
-    <p>Intensity is normalized so that the maximum over all (m,n) is 1. (0,0) order and a 2D heatmap are shown.</p>
-
+    <p>Intensity normalized so that max over all (m,n) is 1.</p>
     <div id="onAxisInfo" class="status"></div>
     <canvas id="heatmap" width="400" height="400"></canvas>
     <div id="intensityTableContainer"></div>
   </div>
 
-  <!-- ===================== SCRIPTS ===================== -->
-  <script type="module">
-    /************* 1. Firebase Setup *************/
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-
-    // TODO: REPLACE with your actual Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyAGH2mKUzliyYytlxnqeJs_hPget2Uiik0",
-  authDomain: "metasurface-9d919.firebaseapp.com",
-  projectId: "metasurface-9d919",
-  storageBucket: "metasurface-9d919.firebasestorage.app",
-  messagingSenderId: "954226935548",
-  appId: "1:954226935548:web:9ef1d9f09810fc3ae8f979",
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
-
-    const libDocRef    = doc(db, "metasurface", "library_400nm");
-    const designDocRef = doc(db, "metasurface", "design_10x10_dim");
-
-    /************* 2. Helper: Parse / Stringify Matrices *************/
+  <!-- ============ SCRIPT ============ -->
+  <script>
+    /********** Helpers: parse matrix **********/
     function parseMatrix(text, expectedRows, expectedCols) {
-      const rows = text.trim().split(/\r?\n/).filter(r => r.trim().length > 0);
+      const rows = text.trim().split(/[\r\n]+/).filter(r => r.trim().length > 0);
       if (rows.length !== expectedRows) {
-        throw new Error(`Expected ${expectedRows} rows, got ${rows.length}`);
+        throw new Error("Expected " + expectedRows + " rows, got " + rows.length);
       }
       const mat = [];
       for (let i = 0; i < expectedRows; i++) {
         const parts = rows[i].trim().split(/[\s,]+/).filter(p => p.length > 0);
         if (parts.length !== expectedCols) {
-          throw new Error(`Row ${i+1}: expected ${expectedCols} columns, got ${parts.length}`);
+          throw new Error("Row " + (i+1) + ": expected " + expectedCols + " columns, got " + parts.length);
         }
         mat[i] = parts.map(Number);
       }
       return mat;
     }
 
-    function matrixToText(mat) {
-      return mat.map(row => row.join(" ")).join("\n");
-    }
-
-    /************* 3. Get / Set UI for Library & Design *************/
-    function getLibraryFromUI() {
-      const phiXText = document.getElementById("libPhiX").value;
-      const phiYText = document.getElementById("libPhiY").value;
-      const txText   = document.getElementById("libTx").value;
-      const tyText   = document.getElementById("libTy").value;
-      return { phiX: phiXText, phiY: phiYText, Tx: txText, Ty: tyText };
-    }
-
-    function setLibraryToUI(libObj) {
-      if (!libObj) return;
-      document.getElementById("libPhiX").value = libObj.phiX || "";
-      document.getElementById("libPhiY").value = libObj.phiY || "";
-      document.getElementById("libTx").value   = libObj.Tx   || "";
-      document.getElementById("libTy").value   = libObj.Ty   || "";
-    }
-
-    function getDesignFromUI() {
+    /********** Simple complex numbers **********/
+    function c(re, im) { return {re, im}; }
+    function cAdd(a, b) { return {re: a.re + b.re, im: a.im + b.im}; }
+    function cMul(a, b) {
       return {
-        Lmap:   document.getElementById("Lmap").value,
-        Wmap:   document.getElementById("Wmap").value,
-        Rotmap: document.getElementById("Rotmap").value
+        re: a.re*b.re - a.im*b.im,
+        im: a.re*b.im + a.im*b.re
       };
     }
+    function cExp(phi) {
+      return {re: Math.cos(phi), im: Math.sin(phi)};
+    }
+    function cAbs2(a) { return a.re*a.re + a.im*a.im; }
 
-    function setDesignToUI(desObj) {
-      if (!desObj) return;
-      document.getElementById("Lmap").value   = desObj.Lmap   || "";
-      document.getElementById("Wmap").value   = desObj.Wmap   || "";
-      document.getElementById("Rotmap").value = desObj.Rotmap || "";
+    // a*b + c0
+    function cAddMul(a, b, c0) {
+      return cAdd(cMul(a,b), c0);
     }
 
-    /************* 4. Firebase Save / Load *************/
-    async function saveLibraryToFirebase() {
-      const statusEl = document.getElementById("libraryStatus");
-      statusEl.textContent = "Saving library to Firebase...";
-      try {
-        const lib = getLibraryFromUI();
-        await setDoc(libDocRef, lib);
-        statusEl.textContent = "Library saved successfully.";
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Error saving library: " + err.message;
-      }
-    }
-
-    async function loadLibraryFromFirebase() {
-      const statusEl = document.getElementById("libraryStatus");
-      statusEl.textContent = "Loading library from Firebase...";
-      try {
-        const snap = await getDoc(libDocRef);
-        if (!snap.exists()) {
-          statusEl.textContent = "No library found in Firebase (metasurface/library_400nm).";
-          return;
-        }
-        const data = snap.data();
-        setLibraryToUI(data);
-        statusEl.textContent = "Library loaded.";
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Error loading library: " + err.message;
-      }
-    }
-
-    async function saveDesignToFirebase() {
-      const statusEl = document.getElementById("designStatus");
-      statusEl.textContent = "Saving design to Firebase...";
-      try {
-        const design = getDesignFromUI();
-        await setDoc(designDocRef, design);
-        statusEl.textContent = "Design saved successfully.";
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Error saving design: " + err.message;
-      }
-    }
-
-    async function loadDesignFromFirebase() {
-      const statusEl = document.getElementById("designStatus");
-      statusEl.textContent = "Loading design from Firebase...";
-      try {
-        const snap = await getDoc(designDocRef);
-        if (!snap.exists()) {
-          statusEl.textContent = "No design found in Firebase (metasurface/design_10x10_dim).";
-          return;
-        }
-        const data = snap.data();
-        setDesignToUI(data);
-        statusEl.textContent = "Design loaded.";
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Error loading design: " + err.message;
-      }
-    }
-
-    document.getElementById("btnSaveLibrary").addEventListener("click", saveLibraryToFirebase);
-    document.getElementById("btnLoadLibrary").addEventListener("click", loadLibraryFromFirebase);
-    document.getElementById("btnSaveDesign").addEventListener("click", saveDesignToFirebase);
-    document.getElementById("btnLoadDesign").addEventListener("click", loadDesignFromFirebase);
-
-    /************* 5. Physics Helpers *************/
-    // Get 24×24 library matrices from textareas
+    /********** Library + design getters **********/
     function getLibraryMatrices() {
       const phiX = parseMatrix(document.getElementById("libPhiX").value, 24, 24);
       const phiY = parseMatrix(document.getElementById("libPhiY").value, 24, 24);
@@ -332,7 +212,6 @@
       return { phiX, phiY, Tx, Ty };
     }
 
-    // Get 10×10 design: L, W, theta (deg)
     function getDesignMatrices() {
       const Lmap   = parseMatrix(document.getElementById("Lmap").value,   10, 10);
       const Wmap   = parseMatrix(document.getElementById("Wmap").value,   10, 10);
@@ -340,61 +219,34 @@
       return { Lmap, Wmap, Rotmap };
     }
 
-    // Map a (L_nm, W_nm) to nearest library indices (0..23)
+    // Map (L,W) to nearest index in 50:10:280 grid
     function libIndexFromDimensions(L_nm, W_nm) {
-      // library grid 50:10:280
       let i = Math.round((L_nm - 50) / 10);
       let j = Math.round((W_nm - 50) / 10);
-      if (i < 0) i = 0;
-      if (i > 23) i = 23;
-      if (j < 0) j = 0;
-      if (j > 23) j = 23;
+      if (i < 0) i = 0; if (i > 23) i = 23;
+      if (j < 0) j = 0; if (j > 23) j = 23;
       return { i, j };
     }
 
-    // Input Jones vector for chosen polarization
-    function inputJonesVector(pol) {
-      const invSqrt2 = 1 / Math.sqrt(2);
-      switch (pol) {
-        case "Ex":  return { Ex: 1, Ey: 0 };
-        case "Ey":  return { Ex: 0, Ey: 1 };
-        case "P45": return { Ex:  invSqrt2, Ey:  invSqrt2 };      // (1,1)/√2
-        case "M45": return { Ex:  invSqrt2, Ey: -invSqrt2 };      // (1,-1)/√2
-        case "RCP": return { Ex:  invSqrt2, Ey: -invSqrt2 * 1j }; // (1,-i)/√2
-        case "LCP": return { Ex:  invSqrt2, Ey:  invSqrt2 * 1j }; // (1,i)/√2
-        default:    return { Ex: 1, Ey: 0 };
-      }
-    }
-
-    // But JS has no native i -> so we represent complex as {re, im}
-    function c(re, im) { return { re, im }; }
-    function cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
-    function cMul(a, b) { return { re: a.re*b.re - a.im*b.im, im: a.re*b.im + a.im*b.re }; }
-    function cExp(iPhi) { return { re: Math.cos(iPhi), im: Math.sin(iPhi) }; }
-    function cAbs2(a) { return a.re*a.re + a.im*a.im; }
-
-    /************* 6. Build Per-Pillar Jones Matrix & Output Field *************/
+    /********** Per-pillar Jones and output fields **********/
     function computePillarFields(pol, library, design) {
-      const Nx = 10;
-      const Ny = 10;
-
+      const Nx = 10, Ny = 10;
       const { phiX, phiY, Tx, Ty } = library;
       const { Lmap, Wmap, Rotmap } = design;
 
-      // Input Jones vector for chosen polarization
-      let Jin;
+      // Input Jones vector (complex) for chosen polarization
       const invSqrt2 = 1/Math.sqrt(2);
+      let Jin;
       switch (pol) {
         case "Ex":  Jin = [c(1,0), c(0,0)]; break;
         case "Ey":  Jin = [c(0,0), c(1,0)]; break;
         case "P45": Jin = [c(invSqrt2,0), c(invSqrt2,0)]; break;
         case "M45": Jin = [c(invSqrt2,0), c(-invSqrt2,0)]; break;
-        case "RCP": Jin = [c(invSqrt2,0), c(0,-invSqrt2)]; break; // (1,-i)/√2
-        case "LCP": Jin = [c(invSqrt2,0), c(0, invSqrt2)]; break; // (1, i)/√2
+        case "RCP": Jin = [c(invSqrt2,0), c(0,-invSqrt2)]; break; // (1, -i)/√2
+        case "LCP": Jin = [c(invSqrt2,0), c(0, invSqrt2)]; break; // (1,  i)/√2
         default:    Jin = [c(1,0), c(0,0)];
       }
 
-      // Output fields at each pillar: Ex_out(px,py), Ey_out(px,py)
       const Ex_out = [];
       const Ey_out = [];
       for (let px = 0; px < Nx; px++) {
@@ -404,46 +256,38 @@
           const L_nm = Lmap[px][py];
           const W_nm = Wmap[px][py];
           const theta_deg = Rotmap[px][py];
-          const { i, j } = libIndexFromDimensions(L_nm, W_nm);
 
+          const { i, j } = libIndexFromDimensions(L_nm, W_nm);
           const phx = phiX[i][j];
           const phy = phiY[i][j];
           const tx  = Tx[i][j];
           const ty  = Ty[i][j];
 
-          // Base Jones matrix (aligned to x,y): diag(tx e^{iφx}, ty e^{iφy})
-          const jxx = cExp(phx); jxx.re *= tx; jxx.im *= tx;
-          const jyy = cExp(phy); jyy.re *= ty; jyy.im *= ty;
+          // diag(tx e^{iφx}, ty e^{iφy})
+          let jxx = cExp(phx); jxx.re *= tx; jxx.im *= tx;
+          let jyy = cExp(phy); jyy.re *= ty; jyy.im *= ty;
 
           const theta = theta_deg * Math.PI / 180;
-          const cth = Math.cos(theta);
-          const sth = Math.sin(theta);
-
-          // Rotation matrices:
-          // R(θ) = [[cth, -sth],[sth, cth]]
-          // J = R(-θ) * diag(jxx, jyy) * R(θ)
+          const cth  = Math.cos(theta);
+          const sth  = Math.sin(theta);
           const cthm = Math.cos(-theta);
           const sthm = Math.sin(-theta);
 
-          // First M = diag(jxx,jyy)*R(θ)
+          // R(θ)
           const r11 = cth,  r12 = -sth;
           const r21 = sth,  r22 =  cth;
 
+          // M = diag(jxx,jyy)*R(θ)
           const m11 = cMul(jxx, c(r11,0));
           const m12 = cMul(jxx, c(r12,0));
           const m21 = cMul(jyy, c(r21,0));
           const m22 = cMul(jyy, c(r22,0));
 
-          // J = R(-θ)*M
+          // R(-θ)
           const rm11 = c(cthm,0), rm12 = c(-sthm,0);
           const rm21 = c(sthm,0), rm22 = c(cthm,0);
 
-          function cAddMul(a,b,c_) {
-            // a*b + c_
-            const prod = cMul(a,b);
-            return cAdd(prod, c_);
-          }
-
+          // J = R(-θ)*M
           const J11 = cAddMul(rm11, m11, cMul(rm12, m21));
           const J12 = cAddMul(rm11, m12, cMul(rm12, m22));
           const J21 = cAddMul(rm21, m11, cMul(rm22, m21));
@@ -462,11 +306,11 @@
       return { Ex_out, Ey_out };
     }
 
-    /************* 7. Far-Field from Per-Pillar Fields *************/
+    /********** Far-field with vector addition **********/
     function computeFarFieldVector(Ex_out, Ey_out, maxOrder) {
       const Nx = Ex_out.length;
       const Ny = Ex_out[0].length;
-      const size = 2 * maxOrder + 1;
+      const size = 2*maxOrder + 1;
 
       const intensities = [];
       for (let i = 0; i < size; i++) {
@@ -482,7 +326,7 @@
           let Fy = c(0,0);
           for (let px = 0; px < Nx; px++) {
             for (let py = 0; py < Ny; py++) {
-              const phase = -2 * Math.PI * (mi * px / Nx + ni * py / Ny);
+              const phase = -2 * Math.PI * (mi*px/Nx + ni*py/Ny);
               const w = cExp(phase);
               Fx = cAdd(Fx, cMul(Ex_out[px][py], w));
               Fy = cAdd(Fy, cMul(Ey_out[px][py], w));
@@ -506,41 +350,39 @@
         I00 /= maxI;
       }
 
-      return { intensities, I00, maxI };
+      return { intensities, I00 };
     }
 
-    /************* 8. Visualization *************/
+    /********** Heatmap + table **********/
     function drawHeatmap(intensities, canvas, maxOrder) {
       const ctx = canvas.getContext("2d");
       const size = intensities.length;
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
+      const W = canvas.width;
+      const H = canvas.height;
+      ctx.clearRect(0,0,W,H);
 
-      const cellW = w / size;
-      const cellH = h / size;
+      const cellW = W / size;
+      const cellH = H / size;
 
       for (let i = 0; i < size; i++) {
         for (let j = 0; j < size; j++) {
           const val = intensities[i][j];
-          const cval = Math.max(0, Math.min(1, val));
-          const r = Math.floor(255 * cval);
+          const v = Math.max(0, Math.min(1, val));
+          const r = Math.floor(255 * v);
           const g = 0;
-          const b = Math.floor(255 * (1 - cval));
+          const b = Math.floor(255 * (1 - v));
           ctx.fillStyle = `rgb(${r},${g},${b})`;
-          ctx.fillRect(j * cellW, i * cellH, cellW, cellH);
+          ctx.fillRect(j*cellW, i*cellH, cellW, cellH);
         }
       }
 
-      // Draw axes lines at m=0 and n=0
+      // indicate m=0 and n=0
+      const z = maxOrder + 0.5;
       ctx.strokeStyle = "white";
       ctx.lineWidth = 1;
-      const zeroIndex = maxOrder + 0.5;
       ctx.beginPath();
-      ctx.moveTo(zeroIndex * cellW, 0);
-      ctx.lineTo(zeroIndex * cellW, h);
-      ctx.moveTo(0, zeroIndex * cellH);
-      ctx.lineTo(w, zeroIndex * cellH);
+      ctx.moveTo(z*cellW, 0);   ctx.lineTo(z*cellW, H);
+      ctx.moveTo(0, z*cellH);   ctx.lineTo(W, z*cellH);
       ctx.stroke();
     }
 
@@ -548,17 +390,15 @@
       const size = intensities.length;
       let html = "<table><thead><tr><th>m \\ n</th>";
       for (let n = -maxOrder; n <= maxOrder; n++) {
-        html += `<th>${n}</th>`;
+        html += "<th>" + n + "</th>";
       }
       html += "</tr></thead><tbody>";
-
       for (let m = -maxOrder; m <= maxOrder; m++) {
-        html += `<tr><th>${m}</th>`;
+        html += "<tr><th>" + m + "</th>";
         for (let n = -maxOrder; n <= maxOrder; n++) {
           const ii = m + maxOrder;
           const jj = n + maxOrder;
-          const val = intensities[ii][jj];
-          html += `<td>${val.toFixed(3)}</td>`;
+          html += "<td>" + intensities[ii][jj].toFixed(3) + "</td>";
         }
         html += "</tr>";
       }
@@ -566,40 +406,37 @@
       return html;
     }
 
-    /************* 9. Run Simulation *************/
+    /********** Main: runSimulation **********/
     function runSimulation() {
       const simStatus = document.getElementById("simStatus");
-      simStatus.textContent = "";
-      document.getElementById("onAxisInfo").textContent = "";
-      document.getElementById("intensityTableContainer").innerHTML = "";
-
+      const onAxisInfo = document.getElementById("onAxisInfo");
+      const tblDiv = document.getElementById("intensityTableContainer");
       const canvas = document.getElementById("heatmap");
+
+      simStatus.textContent = "";
+      onAxisInfo.textContent = "";
+      tblDiv.innerHTML = "";
+
       const pol = document.getElementById("inputPol").value;
       const maxOrder = parseInt(document.getElementById("maxOrder").value, 10);
-
       if (isNaN(maxOrder) || maxOrder < 0 || maxOrder > 12) {
-        simStatus.textContent = "Please choose maxOrder between 0 and 12.";
+        simStatus.textContent = "Choose |m|,|n| between 0 and 12.";
         return;
       }
 
       try {
         const library = getLibraryMatrices();
         const design  = getDesignMatrices();
-
         const { Ex_out, Ey_out } = computePillarFields(pol, library, design);
         const { intensities, I00 } = computeFarFieldVector(Ex_out, Ey_out, maxOrder);
 
         drawHeatmap(intensities, canvas, maxOrder);
-        document.getElementById("onAxisInfo").textContent =
-          `(0,0) order normalized intensity: ${I00.toFixed(3)}`;
-
-        const tableHTML = createIntensityTable(intensities, maxOrder);
-        document.getElementById("intensityTableContainer").innerHTML = tableHTML;
-
+        onAxisInfo.textContent = "(0,0) normalized intensity: " + I00.toFixed(3);
+        tblDiv.innerHTML = createIntensityTable(intensities, maxOrder);
         simStatus.textContent = "Simulation complete.";
       } catch (err) {
         console.error(err);
-        simStatus.textContent = "Error in simulation: " + err.message;
+        simStatus.textContent = "Error: " + err.message;
       }
     }
 
