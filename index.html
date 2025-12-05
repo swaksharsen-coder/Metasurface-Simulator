@@ -1,420 +1,620 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Metasurface Far-Field Simulator (10x10, 6+1 orders)</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 10px; }
-  textarea { width: 100%; height: 120px; font-family: Consolas, monospace; }
-  .section { border: 1px solid #ccc; padding: 8px; margin-bottom: 8px; }
-  .section h2 { margin-top: 0; font-size: 16px; }
-  label { font-weight: bold; display:block; margin-top:6px; }
-  pre { background:#f7f7f7; padding:8px; white-space:pre; }
-</style>
+  <meta charset="UTF-8" />
+  <title>Metasurface 10×10 Far-Field Simulator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      max-width: 1300px;
+    }
+    h1, h2, h3 {
+      margin-top: 0.5em;
+    }
+    textarea {
+      width: 100%;
+      height: 180px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      white-space: pre;
+    }
+    .row {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+    .col {
+      flex: 1;
+      min-width: 0;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 4px;
+    }
+    button {
+      margin: 5px 0;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    select, input[type="text"] {
+      padding: 4px;
+      margin: 5px 0;
+      width: 200px;
+    }
+    #farFieldView table {
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    #farFieldView th, #farFieldView td {
+      border: 1px solid #ccc;
+      padding: 2px 4px;
+      font-size: 10px;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
+  <h1>Metasurface 10×10 Far-Field Simulator</h1>
 
-<h1>Metasurface Far-Field Simulator (10×10, 6 polarizations)</h1>
+  <p>
+    <b>Library:</b> 24×24 grids for pillar unit cell.<br>
+    Rows = length (L, from 50 to 280 nm), Columns = width (W, from 50 to 280 nm).<br>
+    Paste values from Excel: numbers separated by spaces or commas, one row per line.
+  </p>
 
-<div class="section">
-  <h2>1. Library data (24×24 each)</h2>
-  <p>Paste your 24×24 matrices exactly as in MATLAB (rows separated by new line, columns by space/comma).</p>
-  <label>phiX (Ex phase in radians, 24×24)</label>
-  <textarea id="phiXText"></textarea>
+  <div class="row">
+    <div class="col">
+      <label for="phiXInput">Ex phase φ<sub>x</sub>(L,W) [radian] (24×24)</label>
+      <textarea id="phiXInput" placeholder="Paste 24 rows × 24 columns here..."></textarea>
+    </div>
+    <div class="col">
+      <label for="phiYInput">Ey phase φ<sub>y</sub>(L,W) [radian] (24×24)</label>
+      <textarea id="phiYInput" placeholder="Paste 24 rows × 24 columns here..."></textarea>
+    </div>
+  </div>
 
-  <label>phiY (Ey phase in radians, 24×24)</label>
-  <textarea id="phiYText"></textarea>
+  <div class="row">
+    <div class="col">
+      <label for="TxInput">Tx(L,W) (Ex transmission amplitude) (24×24)</label>
+      <textarea id="TxInput" placeholder="Paste 24 rows × 24 columns here..."></textarea>
+    </div>
+    <div class="col">
+      <label for="TyInput">Ty(L,W) (Ey transmission amplitude) (24×24)</label>
+      <textarea id="TyInput" placeholder="Paste 24 rows × 24 columns here..."></textarea>
+    </div>
+  </div>
 
-  <label>Tx (Ex transmission amplitude 0–1, 24×24)</label>
-  <textarea id="TxText"></textarea>
+  <hr>
 
-  <label>Ty (Ey transmission amplitude 0–1, 24×24)</label>
-  <textarea id="TyText"></textarea>
-</div>
+  <h2>Metasurface Design (10×10 pillars)</h2>
+  <p>
+    Paste 10×10 matrices for your final metasurface design. Each row is one line.
+    These are pillar dimensions at each lattice position (p,q).
+  </p>
 
-<div class="section">
-  <h2>2. Metasurface design (10×10)</h2>
-  <p>Paste 10×10 matrices for L, W, and rotation θ (degrees). L and W must be between 50 and 280 nm in 10 nm steps.</p>
-  <label>L (nm, 10×10)</label>
-  <textarea id="LdesignText"></textarea>
+  <div class="row">
+    <div class="col">
+      <label for="LdesignInput">L<sub>design</sub>(p,q) [nm] (10×10)</label>
+      <textarea id="LdesignInput" placeholder="Paste 10×10 L (nm)..."></textarea>
+    </div>
+    <div class="col">
+      <label for="WdesignInput">W<sub>design</sub>(p,q) [nm] (10×10)</label>
+      <textarea id="WdesignInput" placeholder="Paste 10×10 W (nm)..."></textarea>
+    </div>
+    <div class="col">
+      <label for="ThetaDesignInput">θ<sub>design</sub>(p,q) [deg] (10×10)</label>
+      <textarea id="ThetaDesignInput" placeholder="Paste 10×10 rotation (deg)..."></textarea>
+      <small>(Rotation is not used in the simple scalar far-field here, just stored.)</small>
+    </div>
+  </div>
 
-  <label>W (nm, 10×10)</label>
-  <textarea id="WdesignText"></textarea>
+  <hr>
 
-  <label>θ (degrees, 10×10)</label>
-  <textarea id="thetaText"></textarea>
-</div>
+  <h2>Simulation Controls</h2>
 
-<div class="section">
-  <h2>3. Input polarization</h2>
+  <label for="polSelect">Input polarization state:</label>
   <select id="polSelect">
-    <option value="Ex">Ex (1, 0)</option>
-    <option value="Ey">Ey (0, 1)</option>
-    <option value="+45">+45° (1, 1)/√2</option>
-    <option value="-45">-45° (1, -1)/√2</option>
-    <option value="RCP">RCP (1, -i)/√2</option>
-    <option value="LCP">LCP (1, +i)/√2</option>
+    <option value="Ex">Ex (H)</option>
+    <option value="Ey">Ey (V)</option>
+    <option value="P45">+45°</option>
+    <option value="M45">−45°</option>
+    <option value="RCP">RCP</option>
+    <option value="LCP">LCP</option>
   </select>
-  <button onclick="runSimulation()">Simulate</button>
-</div>
 
-<div class="section">
-  <h2>4. Results (numeric)</h2>
-  <pre id="output"></pre>
-</div>
+  <br>
+  <button onclick="runSimulation()">Run Simulation</button>
+  <button onclick="fillDemoDesign()">Fill 10×10 demo design (simple)</button>
 
-<div class="section">
-  <h2>5. Far-field visualization</h2>
-  <p>Spots are drawn at diffraction orders (m,n) with radius proportional to I/ΣI. (0,0) is at the center.</p>
-  <canvas id="farCanvas" width="400" height="400" style="border:1px solid #ccc;"></canvas>
-</div>
+  <p id="simStatus" style="margin-top:8px;color:#006400;font-weight:bold;"></p>
 
-<div class="section">
-  <h2>6. Firebase persistence (optional)</h2>
-  <p>Fill your Firebase config and use the buttons to save/load all text areas.<br>
-     You need a Firestore database and anonymous auth enabled.</p>
-  <label>firebaseConfig (JSON)</label>
-  <textarea id="firebaseConfigText">
-{
-  "apiKey": "YOUR_API_KEY",
-  "authDomain": "YOUR_PROJECT_ID.firebaseapp.com",
-  "projectId": "YOUR_PROJECT_ID",
-  "storageBucket": "YOUR_PROJECT_ID.appspot.com",
-  "messagingSenderId": "YOUR_SENDER_ID",
-  "appId": "YOUR_APP_ID"
-}
-  </textarea>
-  <button onclick="initFirebase()">Init Firebase</button>
-  <button onclick="saveToFirebase()">Save current data to Firebase</button>
-  <button onclick="loadFromFirebase()">Load data from Firebase</button>
-  <pre id="fbStatus"></pre>
-</div>
+  <hr>
 
-<!-- Firebase (compat) SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <h3>Far-field diffraction map (normalized intensity)</h3>
+  <p>
+    Orders m,n from −8 to +8 are shown. (0,0) is outlined in <span style="color:red;">red</span>.<br>
+    For the selected input polarization, the target diffraction order is outlined in
+    <span style="color:blue;">blue</span> (based on your design mapping).
+  </p>
+  <div id="farFieldView"></div>
 
-<script>
-// ---------- Complex utilities ----------
-function C(re, im) { return {re: re, im: im}; }
-function cAdd(a, b) { return {re: a.re + b.re, im: a.im + b.im}; }
-function cSub(a, b) { return {re: a.re - b.re, im: a.im - b.im}; }
-function cMul(a, b) {
-  return {re: a.re*b.re - a.im*b.im, im: a.re*b.im + a.im*b.re};
-}
-function cMulReal(a, r) { return {re: a.re*r, im: a.im*r}; }
-function cAbs2(a) { return a.re*a.re + a.im*a.im; }
-function cExpReal(phi) { return {re: Math.cos(phi), im: Math.sin(phi)}; }
+  <hr>
 
-// ---------- Parsing helpers ----------
-function parseMatrix(text, rows, cols) {
-  const lines = text.trim().split(/\n+/);
-  if (lines.length < rows) {
-    throw new Error("Not enough rows. Expected " + rows + ", got " + lines.length);
-  }
-  const M = [];
-  for (let i = 0; i < rows; i++) {
-    const tokens = lines[i].trim().split(/[\s,]+/).filter(t => t.length > 0);
-    if (tokens.length < cols) {
-      throw new Error("Row " + (i+1) + ": expected " + cols + " columns, got " + tokens.length);
-    }
-    const row = [];
-    for (let j = 0; j < cols; j++) {
-      row.push(parseFloat(tokens[j]));
-    }
-    M.push(row);
-  }
-  return M;
-}
+  <h2>Firebase Save/Load (optional)</h2>
+  <p>
+    You can save and load the text boxes to Firebase Realtime Database so you don’t have to paste every time.
+    <br>First, update the Firebase config in the code below.
+  </p>
+  <label for="designNameInput">Design name / key:</label>
+  <input type="text" id="designNameInput" placeholder="e.g., meta400nm_v1" />
+  <br>
+  <button onclick="saveToFirebase()">Save to Firebase</button>
+  <button onclick="loadFromFirebase()">Load from Firebase</button>
+  <p id="firebaseStatus" style="margin-top:8px;color:#333;"></p>
 
-// map L or W between 50..280 (step 10) to index 0..23
-function dimToIndex(val) {
-  let idx = Math.round((val - 50) / 10);
-  if (idx < 0) idx = 0;
-  if (idx > 23) idx = 23;
-  return idx;
-}
-
-// Jones matrix for rotated pillar from library data
-function jonesFromLib(tEx, tEy, thetaRad) {
-  const c = Math.cos(thetaRad);
-  const s = Math.sin(thetaRad);
-  const c2 = c*c;
-  const s2 = s*s;
-  const cs = c*s;
-
-  // a = tEx, b = tEy
-  const Jxx = cAdd( cMulReal(tEx, c2), cMulReal(tEy, s2) );
-  const diff = cSub(tEy, tEx);
-  const Jxy = cMulReal(diff, cs);
-  const Jyx = {re: Jxy.re, im: Jxy.im};
-  const Jyy = cAdd( cMulReal(tEx, s2), cMulReal(tEy, c2) );
-
-  return {Jxx, Jxy, Jyx, Jyy};
-}
-
-// ---------- Main simulation ----------
-function runSimulation() {
-  const out = document.getElementById("output");
-  out.textContent = "Running...\n";
-
-  try {
-    // 1) Parse library (24×24)
-    const phiX = parseMatrix(document.getElementById("phiXText").value, 24, 24);
-    const phiY = parseMatrix(document.getElementById("phiYText").value, 24, 24);
-    const Tx   = parseMatrix(document.getElementById("TxText").value,   24, 24);
-    const Ty   = parseMatrix(document.getElementById("TyText").value,   24, 24);
-
-    // 2) Parse design (10×10)
-    const Ldes = parseMatrix(document.getElementById("LdesignText").value, 10, 10);
-    const Wdes = parseMatrix(document.getElementById("WdesignText").value, 10, 10);
-    const Th   = parseMatrix(document.getElementById("thetaText").value,   10, 10);
-
-    const Nx = 10, Ny = 10;
-
-    // 3) Input polarization vector
-    const pol = document.getElementById("polSelect").value;
-    let Einx, Einy;
-    const invSqrt2 = 1/Math.sqrt(2);
-    if (pol === "Ex") {
-      Einx = C(1,0); Einy = C(0,0);
-    } else if (pol === "Ey") {
-      Einx = C(0,0); Einy = C(1,0);
-    } else if (pol === "+45") {
-      Einx = C(invSqrt2,0); Einy = C(invSqrt2,0);
-    } else if (pol === "-45") {
-      Einx = C(invSqrt2,0); Einy = C(-invSqrt2,0);
-    } else if (pol === "RCP") {
-      Einx = C(invSqrt2,0); Einy = C(0,-invSqrt2); // (1, -i)/√2
-    } else if (pol === "LCP") {
-      Einx = C(invSqrt2,0); Einy = C(0, invSqrt2); // (1, +i)/√2
+  <!-- =============================== -->
+  <!-- MAIN SIMULATION SCRIPT (non-module) -->
+  <!-- =============================== -->
+  <script>
+    // ==== Utility: parse a matrix from textarea (rows separated by newline, values by space/comma) ====
+    function parseMatrix(text, expectedRows, expectedCols, name) {
+      const rowsRaw = text.trim().split(/\r?\n/).filter(r => r.trim().length > 0);
+      if (rowsRaw.length !== expectedRows) {
+        throw new Error(name + ": expected " + expectedRows + " rows, got " + rowsRaw.length);
+      }
+      const mat = [];
+      for (let i = 0; i < expectedRows; i++) {
+        const vals = rowsRaw[i].trim().split(/[\s,]+/).filter(v => v.length > 0);
+        if (vals.length !== expectedCols) {
+          throw new Error(
+            name + ": row " + (i+1) +
+            " expected " + expectedCols + " columns, got " + vals.length
+          );
+        }
+        mat.push(vals.map(parseFloat));
+      }
+      return mat;
     }
 
-    // 4) Diffraction orders of interest (including 0,0)
-    const orders = [
-      {name: "(0, 0)",  m:  0, n:  0},
-      {name: "(+2, 0)", m:  2, n:  0},
-      {name: "(-2, 0)", m: -2, n:  0},
-      {name: "(0, +2)", m:  0, n:  2},
-      {name: "(0, -2)", m:  0, n: -2},
-      {name: "(+2, +2)", m:  2, n:  2},
-      {name: "(-2, -2)", m: -2, n: -2}
-    ];
+    // ==== Build library from 2D text inputs ====
+    function buildLibraryFromInputs() {
+      const phiX_2D = parseMatrix(
+        document.getElementById("phiXInput").value,
+        24, 24, "phiX"
+      );
+      const phiY_2D = parseMatrix(
+        document.getElementById("phiYInput").value,
+        24, 24, "phiY"
+      );
+      const Tx_2D = parseMatrix(
+        document.getElementById("TxInput").value,
+        24, 24, "Tx"
+      );
+      const Ty_2D = parseMatrix(
+        document.getElementById("TyInput").value,
+        24, 24, "Ty"
+      );
 
-    // accumulators for each order
-    const amps = orders.map(() => ({
-      Ex: C(0,0),
-      Ey: C(0,0)
-    }));
+      const L_LIST = Array.from({ length: 24 }, (_, i) => 50 + 10 * i); // 50..280
+      const W_LIST = Array.from({ length: 24 }, (_, i) => 50 + 10 * i);
 
-    // 5) Loop over pillars
-    for (let px = 0; px < Nx; px++) {
-      for (let py = 0; py < Ny; py++) {
+      return {
+        phiX_2D,
+        phiY_2D,
+        Tx_2D,
+        Ty_2D,
+        L_LIST,
+        W_LIST
+      };
+    }
 
-        const Lnm = Ldes[px][py];
-        const Wnm = Wdes[px][py];
-        const thetaDeg = Th[px][py];
-        const thetaRad = thetaDeg * Math.PI / 180.0;
+    // ==== Find index in [50,60,...,280] closest to value ====
+    function findIndexForValue(list, val) {
+      // Round to nearest 10 and clamp
+      let rounded = Math.round((val - 50) / 10) * 10 + 50;
+      if (rounded < 50) rounded = 50;
+      if (rounded > 280) rounded = 280;
+      const idx = (rounded - 50) / 10;  // 0..23
+      return idx;
+    }
 
-        const iL = dimToIndex(Lnm);
-        const iW = dimToIndex(Wnm);
+    // ==== Get 10x10 metasurface design (L,W,theta) from text ====
+    function getDesignMatrices() {
+      const L_design = parseMatrix(
+        document.getElementById("LdesignInput").value,
+        10, 10, "L_design"
+      );
+      const W_design = parseMatrix(
+        document.getElementById("WdesignInput").value,
+        10, 10, "W_design"
+      );
+      const Theta_design = parseMatrix(
+        document.getElementById("ThetaDesignInput").value,
+        10, 10, "Theta_design"
+      );
+      return { L_design, W_design, Theta_design };
+    }
 
-        const phx = phiX[iL][iW];
-        const phy = phiY[iL][iW];
-        const txAmp = Tx[iL][iW];
-        const tyAmp = Ty[iL][iW];
+    // ==== Build complex field for selected input polarization ====
+    function buildComplexField(library, design, pol) {
+      const { phiX_2D, phiY_2D, Tx_2D, Ty_2D, L_LIST, W_LIST } = library;
+      const { L_design, W_design } = design;
 
-        // complex transmissions in local frame
-        const tEx = C(txAmp * Math.cos(phx), txAmp * Math.sin(phx));
-        const tEy = C(tyAmp * Math.cos(phy), tyAmp * Math.sin(phy));
+      const Nx = 10;
+      const Ny = 10;
 
-        // Jones matrix in lab frame
-        const J = jonesFromLib(tEx, tEy, thetaRad);
+      // Define input Jones vector [Ex Ey]
+      let inEx = 0, inEy = 0;
+      const invRoot2 = 1 / Math.sqrt(2);
+      switch (pol) {
+        case "Ex":   inEx = 1; inEy = 0; break;
+        case "Ey":   inEx = 0; inEy = 1; break;
+        case "P45":  inEx = invRoot2; inEy = invRoot2; break;
+        case "M45":  inEx = invRoot2; inEy = -invRoot2; break;
+        case "RCP":  inEx = invRoot2; inEy = -invRoot2 * 1j; break; // We'll handle i via complex
+        case "LCP":  inEx = invRoot2; inEy = invRoot2 * 1j; break;
+      }
 
-        // field after this pillar
-        const Ex_out = cAdd( cMul(J.Jxx, Einx), cMul(J.Jxy, Einy) );
-        const Ey_out = cAdd( cMul(J.Jyx, Einx), cMul(J.Jyy, Einy) );
+      // For JS, we handle RCP/LCP special cases explicitly
+      const complexField = Array.from({ length: Nx }, () =>
+        Array.from({ length: Ny }, () => ({ re: 0, im: 0 }))
+      );
 
-        // add contribution to each diffraction order
-        for (let k = 0; k < orders.length; k++) {
-          const m = orders[k].m;
-          const n = orders[k].n;
-          const phase = -2*Math.PI*( m*px/Nx + n*py/Ny );
-          const w = cExpReal(phase);
-          amps[k].Ex = cAdd(amps[k].Ex, cMul(Ex_out, w));
-          amps[k].Ey = cAdd(amps[k].Ey, cMul(Ey_out, w));
+      for (let p = 0; p < Nx; p++) {
+        for (let q = 0; q < Ny; q++) {
+          const L_nm = L_design[p][q];
+          const W_nm = W_design[p][q];
+
+          const iL = findIndexForValue(L_LIST, L_nm); // 0..23
+          const jW = findIndexForValue(W_LIST, W_nm); // 0..23
+
+          const phiX = phiX_2D[iL][jW];
+          const phiY = phiY_2D[iL][jW];
+          const Tx = Tx_2D[iL][jW];
+          const Ty = Ty_2D[iL][jW];
+
+          // Transmission matrix in linear basis is diagonal:
+          // Ex_out = Tx * e^{i φx} * Ex_in
+          // Ey_out = Ty * e^{i φy} * Ey_in
+
+          // Input vector for each case:
+          let Ex_in_re = 0, Ex_in_im = 0;
+          let Ey_in_re = 0, Ey_in_im = 0;
+
+          if (pol === "Ex") {
+            Ex_in_re = 1; Ey_in_re = 0;
+          } else if (pol === "Ey") {
+            Ex_in_re = 0; Ey_in_re = 1;
+          } else if (pol === "P45") {
+            Ex_in_re = invRoot2; Ey_in_re = invRoot2;
+          } else if (pol === "M45") {
+            Ex_in_re = invRoot2; Ey_in_re = -invRoot2;
+          } else if (pol === "RCP") {
+            // (1/√2)[1, -i]
+            Ex_in_re = invRoot2;
+            Ey_in_im = -invRoot2;
+          } else if (pol === "LCP") {
+            // (1/√2)[1, +i]
+            Ex_in_re = invRoot2;
+            Ey_in_im = invRoot2;
+          }
+
+          // e^{i φx}
+          const cx = Math.cos(phiX);
+          const sx = Math.sin(phiX);
+          // e^{i φy}
+          const cy = Math.cos(phiY);
+          const sy = Math.sin(phiY);
+
+          // Ex_out = Tx * e^{i φx} * Ex_in
+          const Ex_out_re = Tx * (Ex_in_re * cx - Ex_in_im * sx);
+          const Ex_out_im = Tx * (Ex_in_re * sx + Ex_in_im * cx);
+
+          // Ey_out = Ty * e^{i φy} * Ey_in
+          const Ey_out_re = Ty * (Ey_in_re * cy - Ey_in_im * sy);
+          const Ey_out_im = Ty * (Ey_in_re * sy + Ey_in_im * cy);
+
+          // Total scalar field = Ex_out + Ey_out
+          complexField[p][q] = {
+            re: Ex_out_re + Ey_out_re,
+            im: Ex_out_im + Ey_out_im
+          };
         }
       }
+
+      return complexField;
     }
 
-    // 6) Compute intensities
-    const intensities = [];
-    let Imax = 0;
-    let Itot = 0;
-    for (let k = 0; k < orders.length; k++) {
-      const I = cAbs2(amps[k].Ex) + cAbs2(amps[k].Ey);
-      intensities.push(I);
-      if (I > Imax) Imax = I;
-      Itot += I;
-    }
+    // ==== Compute far-field over orders m,n = -maxOrder..+maxOrder ====
+    function computeFarFieldAllOrders(complexField, maxOrder) {
+      const Nx = complexField.length;
+      const Ny = complexField[0].length;
+      const size = 2 * maxOrder + 1;
 
-    // 7) Print results with two normalizations
-    let txt = "";
-    txt += "Input polarization: " + pol + "\n\n";
-    txt += "Order     Raw Intensity     I/I_max    I/sum(I)\n";
-    txt += "-----------------------------------------------\n";
-    for (let k = 0; k < orders.length; k++) {
-      const I = intensities[k];
-      const nMax = (Imax > 0) ? (I / Imax) : 0;
-      const nSum = (Itot > 0) ? (I / Itot) : 0;
-      txt += `${orders[k].name.padEnd(9)} ${I.toExponential(3).padStart(14)}  ${nMax.toFixed(3).padStart(7)}  ${nSum.toFixed(3).padStart(8)}\n`;
-    }
-    txt += "\nCheck: sum_{orders} I/sum(I) = " + (Itot>0 ? "1.000" : "0.000") + "\n";
-    out.textContent = txt;
+      const farField = Array.from({ length: size }, (_, i) =>
+        Array.from({ length: size }, (_, j) => ({
+          re: 0, im: 0, I: 0, Inorm: 0,
+          m: i - maxOrder,
+          n: j - maxOrder
+        }))
+      );
 
-    drawFarField(orders, intensities, Itot);
-
-  } catch (e) {
-    out.textContent = "Error: " + e.message;
-    const ctx = document.getElementById("farCanvas").getContext("2d");
-    ctx.clearRect(0,0,400,400);
-  }
-}
-
-// ---------- Far-field visualization ----------
-function drawFarField(orders, intensities, Itot) {
-  const canvas = document.getElementById("farCanvas");
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  const cx = canvas.width/2;
-  const cy = canvas.height/2;
-  const scale = 50;  // pixels per diffraction order
-  const maxRadius = 25;
-
-  // draw axes
-  ctx.strokeStyle = "#cccccc";
-  ctx.beginPath();
-  ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy);
-  ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height);
-  ctx.stroke();
-
-  // draw each order
-  for (let k = 0; k < orders.length; k++) {
-    const m = orders[k].m;
-    const n = orders[k].n;
-    const I = intensities[k];
-    const frac = (Itot>0) ? (I/Itot) : 0;
-    const r = maxRadius * Math.sqrt(frac); // radius ~ sqrt(I) for visibility
-
-    const x = cx + m*scale;
-    const y = cy - n*scale;
-
-    // circle
-    ctx.beginPath();
-    ctx.fillStyle = "rgba(0,0,255,0.3)";
-    ctx.strokeStyle = "rgba(0,0,180,0.9)";
-    ctx.arc(x,y, r, 0, 2*Math.PI);
-    ctx.fill();
-    ctx.stroke();
-
-    // label
-    ctx.fillStyle = "#000000";
-    ctx.font = "10px Arial";
-    ctx.fillText(orders[k].name, x-18, y- (r+4));
-  }
-}
-
-// ---------- Firebase persistence ----------
-let fbApp = null;
-let fbAuth = null;
-let fbDB = null;
-let fbUserId = null;
-
-function initFirebase() {
-  const status = document.getElementById("fbStatus");
-  try {
-    const cfgText = document.getElementById("firebaseConfigText").value;
-    const cfg = JSON.parse(cfgText);
-
-    fbApp = firebase.initializeApp(cfg);
-    fbAuth = firebase.auth();
-    fbDB   = firebase.firestore();
-
-    fbAuth.signInAnonymously()
-      .then(cred => {
-        fbUserId = cred.user.uid;
-        status.textContent = "Firebase initialized. Anonymous UID: " + fbUserId;
-      })
-      .catch(err => {
-        status.textContent = "Auth error: " + err.message;
-      });
-  } catch (e) {
-    status.textContent = "Config parse/init error: " + e.message;
-  }
-}
-
-function collectAllTextareas() {
-  return {
-    phiXText: document.getElementById("phiXText").value,
-    phiYText: document.getElementById("phiYText").value,
-    TxText: document.getElementById("TxText").value,
-    TyText: document.getElementById("TyText").value,
-    LdesignText: document.getElementById("LdesignText").value,
-    WdesignText: document.getElementById("WdesignText").value,
-    thetaText: document.getElementById("thetaText").value
-  };
-}
-
-function fillAllTextareas(data) {
-  if (!data) return;
-  document.getElementById("phiXText").value = data.phiXText || "";
-  document.getElementById("phiYText").value = data.phiYText || "";
-  document.getElementById("TxText").value   = data.TxText   || "";
-  document.getElementById("TyText").value   = data.TyText   || "";
-  document.getElementById("LdesignText").value = data.LdesignText || "";
-  document.getElementById("WdesignText").value = data.WdesignText || "";
-  document.getElementById("thetaText").value   = data.thetaText   || "";
-}
-
-function saveToFirebase() {
-  const status = document.getElementById("fbStatus");
-  if (!fbDB || !fbUserId) {
-    status.textContent = "Firebase not initialized or user not signed in.";
-    return;
-  }
-  const data = collectAllTextareas();
-  fbDB.collection("metasurfaceConfigs").doc(fbUserId)
-    .set(data)
-    .then(() => {
-      status.textContent = "Saved to Firestore for user " + fbUserId;
-    })
-    .catch(err => {
-      status.textContent = "Save error: " + err.message;
-    });
-}
-
-function loadFromFirebase() {
-  const status = document.getElementById("fbStatus");
-  if (!fbDB || !fbUserId) {
-    status.textContent = "Firebase not initialized or user not signed in.";
-    return;
-  }
-  fbDB.collection("metasurfaceConfigs").doc(fbUserId)
-    .get()
-    .then(doc => {
-      if (doc.exists) {
-        fillAllTextareas(doc.data());
-        status.textContent = "Loaded config from Firestore.";
-      } else {
-        status.textContent = "No saved config found for this user.";
+      for (let m = -maxOrder; m <= maxOrder; m++) {
+        for (let n = -maxOrder; n <= maxOrder; n++) {
+          let re = 0, im = 0;
+          for (let px = 0; px < Nx; px++) {
+            for (let qy = 0; qy < Ny; qy++) {
+              const a = complexField[px][qy];
+              const phase = -2 * Math.PI * (m * px / Nx + n * qy / Ny);
+              const c = Math.cos(phase);
+              const s = Math.sin(phase);
+              const newRe = a.re * c - a.im * s;
+              const newIm = a.re * s + a.im * c;
+              re += newRe;
+              im += newIm;
+            }
+          }
+          const I = re * re + im * im;
+          const i = m + maxOrder;
+          const j = n + maxOrder;
+          farField[i][j].re = re;
+          farField[i][j].im = im;
+          farField[i][j].I  = I;
+        }
       }
-    })
-    .catch(err => {
-      status.textContent = "Load error: " + err.message;
-    });
-}
-</script>
+
+      // Normalize so sum(Inorm) = 1
+      let totalI = 0;
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          totalI += farField[i][j].I;
+        }
+      }
+      if (totalI > 0) {
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            farField[i][j].Inorm = farField[i][j].I / totalI;
+          }
+        }
+      }
+
+      return farField;
+    }
+
+    // ==== Render far-field as table ====
+    function renderFarFieldTable(farField, maxOrder, pol) {
+      const size = 2 * maxOrder + 1;
+      const container = document.getElementById("farFieldView");
+      container.innerHTML = "";
+
+      // Determine highlight target order based on pol
+      let target_m = null, target_n = null;
+      if (pol === "Ex")   { target_m = +2; target_n = 0; }
+      if (pol === "Ey")   { target_m = -2; target_n = 0; }
+      if (pol === "RCP")  { target_m = 0;  target_n = +2; }
+      if (pol === "LCP")  { target_m = 0;  target_n = -2; }
+      if (pol === "P45")  { target_m = +2; target_n = +2; }
+      if (pol === "M45")  { target_m = -2; target_n = -2; }
+
+      // Find max normalized intensity
+      let maxInorm = 0;
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          if (farField[i][j].Inorm > maxInorm) {
+            maxInorm = farField[i][j].Inorm;
+          }
+        }
+      }
+      if (maxInorm === 0) maxInorm = 1;
+
+      const table = document.createElement("table");
+
+      // Header row (n axis)
+      const headerRow = document.createElement("tr");
+      const corner = document.createElement("th");
+      corner.textContent = "m↓ / n→";
+      headerRow.appendChild(corner);
+
+      for (let n = -maxOrder; n <= maxOrder; n++) {
+        const th = document.createElement("th");
+        th.textContent = n;
+        headerRow.appendChild(th);
+      }
+      table.appendChild(headerRow);
+
+      // Rows
+      for (let i = 0; i < size; i++) {
+        const row = document.createElement("tr");
+        const m = i - maxOrder;
+
+        const th = document.createElement("th");
+        th.textContent = m;
+        row.appendChild(th);
+
+        for (let j = 0; j < size; j++) {
+          const cell = document.createElement("td");
+          const f = farField[i][j];
+          const val = f.Inorm;
+
+          const level = Math.sqrt(val / maxInorm);
+          const g = Math.round(255 * (1 - level));
+          cell.style.backgroundColor = "rgb(" + g + "," + g + "," + g + ")";
+          cell.textContent = val.toFixed(3);
+
+          // highlight (0,0)
+          if (f.m === 0 && f.n === 0) {
+            cell.style.outline = "2px solid red";
+          }
+
+          // highlight target order in blue
+          if (target_m !== null && target_n !== null &&
+              f.m === target_m && f.n === target_n) {
+            cell.style.outline = "2px solid blue";
+          }
+
+          row.appendChild(cell);
+        }
+        table.appendChild(row);
+      }
+
+      container.appendChild(table);
+    }
+
+    // ==== Main runSimulation function ====
+    function runSimulation() {
+      const status = document.getElementById("simStatus");
+      status.textContent = "";
+      try {
+        const library = buildLibraryFromInputs();
+        const design = getDesignMatrices();
+        const pol = document.getElementById("polSelect").value;
+
+        const complexField = buildComplexField(library, design, pol);
+        const maxOrder = 8;
+        const farField = computeFarFieldAllOrders(complexField, maxOrder);
+
+        // Check normalization
+        const sumInorm = farField
+          .flat()
+          .reduce((s, f) => s + f.Inorm, 0);
+        console.log("Sum of Inorm =", sumInorm);
+
+        renderFarFieldTable(farField, maxOrder, pol);
+        status.textContent =
+          "Simulation completed. Sum of normalized intensity ≈ " +
+          sumInorm.toFixed(4);
+      } catch (err) {
+        console.error(err);
+        status.style.color = "red";
+        status.textContent = "Error: " + err.message;
+      }
+    }
+
+    // ==== Demo: simple 10×10 design fill (just for testing) ====
+    function fillDemoDesign() {
+      const rows = [];
+      for (let i = 0; i < 10; i++) {
+        const rowL = [];
+        const rowW = [];
+        const rowT = [];
+        for (let j = 0; j < 10; j++) {
+          rowL.push(50 + 10 * (i % 24)); // simple pattern
+          rowW.push(50 + 10 * (j % 24));
+          rowT.push(0); // no rotation
+        }
+        rows.push(rowL.join(" "));
+      }
+      document.getElementById("LdesignInput").value =
+        rows.join("\n");
+      document.getElementById("WdesignInput").value =
+        rows.join("\n");
+      document.getElementById("ThetaDesignInput").value =
+        Array(10).fill(Array(10).fill(0).join(" ")).join("\n");
+    }
+
+    // expose demo function to global scope (just in case)
+    window.fillDemoDesign = fillDemoDesign;
+    window.runSimulation = runSimulation;
+  </script>
+
+  <!-- =============================== -->
+  <!-- FIREBASE SCRIPT (module) -->
+  <!-- =============================== -->
+  <script type="module">
+    // ---- Replace this config with your own from Firebase console ----
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
+    import {
+      getDatabase,
+      ref,
+      set,
+      get,
+      child
+    } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-database.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    function getDesignName() {
+      const nameEl = document.getElementById("designNameInput");
+      const name = nameEl.value.trim();
+      if (!name) {
+        throw new Error("Please enter a design name/key before saving or loading.");
+      }
+      return name;
+    }
+
+    async function saveToFirebase() {
+      const statusEl = document.getElementById("firebaseStatus");
+      statusEl.style.color = "#333";
+      statusEl.textContent = "Saving to Firebase...";
+
+      try {
+        const name = getDesignName();
+        const data = {
+          phiX: document.getElementById("phiXInput").value,
+          phiY: document.getElementById("phiYInput").value,
+          Tx: document.getElementById("TxInput").value,
+          Ty: document.getElementById("TyInput").value,
+          Ldesign: document.getElementById("LdesignInput").value,
+          Wdesign: document.getElementById("WdesignInput").value,
+          ThetaDesign: document.getElementById("ThetaDesignInput").value
+        };
+        await set(ref(db, "designs/" + name), data);
+        statusEl.style.color = "green";
+        statusEl.textContent = "Saved to Firebase under 'designs/" + name + "'.";
+      } catch (err) {
+        console.error(err);
+        statusEl.style.color = "red";
+        statusEl.textContent = "Save error: " + err.message;
+      }
+    }
+
+    async function loadFromFirebase() {
+      const statusEl = document.getElementById("firebaseStatus");
+      statusEl.style.color = "#333";
+      statusEl.textContent = "Loading from Firebase...";
+
+      try {
+        const name = getDesignName();
+        const dbRef = ref(db);
+        const snapshot = await get(child(dbRef, "designs/" + name));
+        if (!snapshot.exists()) {
+          throw new Error("No data found at 'designs/" + name + "'.");
+        }
+        const data = snapshot.val();
+        document.getElementById("phiXInput").value = data.phiX || "";
+        document.getElementById("phiYInput").value = data.phiY || "";
+        document.getElementById("TxInput").value   = data.Tx   || "";
+        document.getElementById("TyInput").value   = data.Ty   || "";
+        document.getElementById("LdesignInput").value      = data.Ldesign      || "";
+        document.getElementById("WdesignInput").value      = data.Wdesign      || "";
+        document.getElementById("ThetaDesignInput").value  = data.ThetaDesign  || "";
+
+        statusEl.style.color = "green";
+        statusEl.textContent = "Loaded design '" + name + "' from Firebase.";
+      } catch (err) {
+        console.error(err);
+        statusEl.style.color = "red";
+        statusEl.textContent = "Load error: " + err.message;
+      }
+    }
+
+    // Expose to global (so buttons can call them)
+    window.saveToFirebase = saveToFirebase;
+    window.loadFromFirebase = loadFromFirebase;
+  </script>
 </body>
 </html>
