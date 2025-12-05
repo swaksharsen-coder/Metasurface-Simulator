@@ -242,80 +242,109 @@
       return { L_design, W_design, Theta_design };
     }
 
-    // ==== Build complex field for selected input polarization ====
-    function buildComplexField(library, design, pol) {
-      const { phiX_2D, phiY_2D, Tx_2D, Ty_2D, L_LIST, W_LIST } = library;
-      const { L_design, W_design } = design;
+    // ==== Build complex field for selected input polarization (with rotation θ) ====
+function buildComplexField(library, design, pol) {
+  const { phiX_2D, phiY_2D, Tx_2D, Ty_2D, L_LIST, W_LIST } = library;
+  const { L_design, W_design, Theta_design } = design;
 
-      const Nx = 10;
-      const Ny = 10;
+  const Nx = 10;
+  const Ny = 10;
 
-      const complexField = Array.from({ length: Nx }, () =>
-        Array.from({ length: Ny }, () => ({ re: 0, im: 0 }))
-      );
+  // complexField[p][q] = {re, im}
+  const complexField = Array.from({ length: Nx }, () =>
+    Array.from({ length: Ny }, () => ({ re: 0, im: 0 }))
+  );
 
-      const invRoot2 = 1 / Math.sqrt(2);
+  const invRoot2 = 1 / Math.sqrt(2);
 
-      for (let p = 0; p < Nx; p++) {
-        for (let q = 0; q < Ny; q++) {
-          const L_nm = L_design[p][q];
-          const W_nm = W_design[p][q];
+  for (let p = 0; p < Nx; p++) {
+    for (let q = 0; q < Ny; q++) {
+      const L_nm = L_design[p][q];
+      const W_nm = W_design[p][q];
 
-          const iL = findIndexForValue(L_LIST, L_nm); // 0..23
-          const jW = findIndexForValue(W_LIST, W_nm); // 0..23
+      // Map L,W to library indices (0..23)
+      const iL = findIndexForValue(L_LIST, L_nm);
+      const jW = findIndexForValue(W_LIST, W_nm);
 
-          const phiX = phiX_2D[iL][jW];
-          const phiY = phiY_2D[iL][jW];
-          const Tx = Tx_2D[iL][jW];
-          const Ty = Ty_2D[iL][jW];
+      const phiX = phiX_2D[iL][jW];
+      const phiY = phiY_2D[iL][jW];
+      const Tx = Tx_2D[iL][jW];
+      const Ty = Ty_2D[iL][jW];
 
-          // Input Jones vector [Ex Ey], complex.
-          let Ex_in_re = 0, Ex_in_im = 0;
-          let Ey_in_re = 0, Ey_in_im = 0;
+      // -------- Input Jones vector [Ex Ey]^T (complex) --------
+      let Ex_in_re = 0, Ex_in_im = 0;
+      let Ey_in_re = 0, Ey_in_im = 0;
 
-          if (pol === "Ex") {
-            Ex_in_re = 1; Ey_in_re = 0;
-          } else if (pol === "Ey") {
-            Ex_in_re = 0; Ey_in_re = 1;
-          } else if (pol === "P45") {
-            Ex_in_re = invRoot2; Ey_in_re = invRoot2;
-          } else if (pol === "M45") {
-            Ex_in_re = invRoot2; Ey_in_re = -invRoot2;
-          } else if (pol === "RCP") {
-            // (1/√2)[1, -i]
-            Ex_in_re = invRoot2;
-            Ey_in_im = -invRoot2;
-          } else if (pol === "LCP") {
-            // (1/√2)[1, +i]
-            Ex_in_re = invRoot2;
-            Ey_in_im = invRoot2;
-          }
-
-          // e^{i φx}
-          const cx = Math.cos(phiX);
-          const sx = Math.sin(phiX);
-          // e^{i φy}
-          const cy = Math.cos(phiY);
-          const sy = Math.sin(phiY);
-
-          // Ex_out = Tx * e^{i φx} * Ex_in
-          const Ex_out_re = Tx * (Ex_in_re * cx - Ex_in_im * sx);
-          const Ex_out_im = Tx * (Ex_in_re * sx + Ex_in_im * cx);
-
-          // Ey_out = Ty * e^{i φy} * Ey_in
-          const Ey_out_re = Ty * (Ey_in_re * cy - Ey_in_im * sy);
-          const Ey_out_im = Ty * (Ey_in_re * sy + Ey_in_im * cy);
-
-          // Total scalar field = Ex_out + Ey_out
-          complexField[p][q] = {
-            re: Ex_out_re + Ey_out_re,
-            im: Ex_out_im + Ey_out_im
-          };
-        }
+      if (pol === "Ex") {
+        Ex_in_re = 1; Ey_in_re = 0;
+      } else if (pol === "Ey") {
+        Ex_in_re = 0; Ey_in_re = 1;
+      } else if (pol === "P45") {
+        Ex_in_re = invRoot2; Ey_in_re = invRoot2;
+      } else if (pol === "M45") {
+        Ex_in_re = invRoot2; Ey_in_re = -invRoot2;
+      } else if (pol === "RCP") {
+        // (1/√2)[1, -i]
+        Ex_in_re = invRoot2;
+        Ey_in_im = -invRoot2;
+      } else if (pol === "LCP") {
+        // (1/√2)[1, +i]
+        Ex_in_re = invRoot2;
+        Ey_in_im = invRoot2;
       }
 
-      return complexField;
+      // -------- Rotation angle θ for this pillar (degrees -> radians) --------
+      const theta_deg = Theta_design[p][q];
+      const theta = theta_deg * Math.PI / 180;
+      const c = Math.cos(theta);
+      const s = Math.sin(theta);
+
+      // -------- 1) Rotate input into local frame: E_local = R(θ) * E_in --------
+      // Real parts
+      const Ex_loc_re =  c * Ex_in_re - s * Ey_in_re;
+      const Ey_loc_re =  s * Ex_in_re + c * Ey_in_re;
+      // Imaginary parts
+      const Ex_loc_im =  c * Ex_in_im - s * Ey_in_im;
+      const Ey_loc_im =  s * Ex_in_im + c * Ey_in_im;
+
+      // -------- 2) Apply diagonal transmission/phase in local frame --------
+      // e^{i φx}
+      const cx = Math.cos(phiX);
+      const sx = Math.sin(phiX);
+      // e^{i φy}
+      const cy = Math.cos(phiY);
+      const sy = Math.sin(phiY);
+
+      // Ex_local_out = Tx * e^{i φx} * Ex_local
+      const Ex_loc_out_re = Tx * (Ex_loc_re * cx - Ex_loc_im * sx);
+      const Ex_loc_out_im = Tx * (Ex_loc_re * sx + Ex_loc_im * cx);
+
+      // Ey_local_out = Ty * e^{i φy} * Ey_local
+      const Ey_loc_out_re = Ty * (Ey_loc_re * cy - Ey_loc_im * sy);
+      const Ey_loc_out_im = Ty * (Ey_loc_re * sy + Ey_loc_im * cy);
+
+      // -------- 3) Rotate back to lab frame: E_out = R(-θ) * E_local_out --------
+      // R(-θ) = [[ c, s],
+      //          [-s, c]]
+
+      // Real parts
+      const Ex_out_re =  c * Ex_loc_out_re + s * Ey_loc_out_re;
+      const Ey_out_re = -s * Ex_loc_out_re + c * Ey_loc_out_re;
+
+      // Imaginary parts
+      const Ex_out_im =  c * Ex_loc_out_im + s * Ey_loc_out_im;
+      const Ey_out_im = -s * Ex_loc_out_im + c * Ey_loc_out_im;
+
+      // -------- Total scalar field used for diffraction (sum of both pols) --------
+      complexField[p][q] = {
+        re: Ex_out_re + Ey_out_re,
+        im: Ex_out_im + Ey_out_im
+      };
     }
+  }
+
+  return complexField;
+}
 
     // ==== Compute far-field over orders m,n = -maxOrder..+maxOrder ====
     function computeFarFieldAllOrders(complexField, maxOrder) {
